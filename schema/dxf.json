@@ -1,0 +1,207 @@
+{
+  "title": "DXF Schema",
+  "type": "object",
+  "properties": {
+    "header": {
+      "type": "object",
+
+      "additionalProperties": false
+    },
+    "blocks": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": { "$ref": "#/definitions/block" }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "oneOf": [{ "$ref": "#/definitions/entityText" }, { "$ref": "#/definitions/entityInsert" }]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": ["header", "blocks", "entities"],
+
+  "definitions": {
+    "point": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "additionalProperties": false
+
+    },
+
+    "vertex": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "const": "VERTEX" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "layer": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "required": ["x", "y", "layer", "type"]
+    },
+
+    "block": {
+      "type": "object",
+      "properties": {
+        "layer": { "type": "string" },
+        "name": { "type": "string" },
+        "type": {
+          "type": "number"
+        },
+        "position": { "$ref": "#/definitions/point" },
+        "entities": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/blockEntity" }
+        },
+        "handle": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["handle", "type", "layer", "name"]
+    },
+
+    "blockEntity": {
+      "type": "object",
+      "oneOf": [{ "$ref": "#/definitions/entityText" }, { "$ref": "#/definitions/entityPoint" }, { "$ref": "#/definitions/entityPolyline" }, { "$ref": "#/definitions/entityLine" }, { "$ref": "#/definitions/entityAttDef" }]
+    },
+
+    "entityPolyline": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "POLYLINE"
+        },
+        "vertices": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/vertex" }
+        },
+        "layer": { "type": "string" },
+        "shape": { "type": "boolean" },
+        "includesCurveFitVertices": { "type": "boolean" },
+        "includesSplineFitVertices": { "type": "boolean" },
+        "is3dPolyline": { "type": "boolean" },
+        "is3dPolygonMesh": { "type": "boolean" },
+        "is3dPolygonMeshClosed": { "type": "boolean" },
+        "isPolyfaceMesh": { "type": "boolean" },
+        "hasContinuousLinetypePattern": { "type": "boolean" },
+        "handle": { "type": "integer" }
+      },
+      "additionalProperties": false,
+      "required": ["handle", "type", "layer"]
+    },
+
+    "entityLine": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "LINE"
+        },
+        "vertices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/point"
+          }
+        },
+        "layer": { "type": "string" },
+        "handle": { "type": "integer" }
+      },
+      "additionalProperties": false,
+      "required": ["handle", "type", "layer"]
+    },
+
+    "entityPoint": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "POINT"
+        },
+        "position": {
+          "$ref": "#/definitions/point"
+        },
+        "layer": { "type": "string" },
+        "handle": { "type": "integer" },
+        "angle": { "type": "number" },
+        "thickness": { "type": "number" }
+      },
+      "additionalProperties": false,
+      "required": ["handle", "type", "layer"]
+    },
+
+    "entityText": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "TEXT"
+        },
+        "layer": { "type": "string" },
+        "style": { "type": "string" },
+        "startPoint": { "$ref": "#/definitions/point" },
+        "textHeight": { "type": "number" },
+        "rotation": { "type": "number" },
+        "text": { "type": "string" },
+        "handle": {
+          "description": "A handle is a hexadecimal number that is a unique tag for each entity in a drawing or DXF file. There must be no duplicate handles",
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["handle", "type", "layer"]
+    },
+
+    "entityInsert": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "INSERT"
+        },
+        "layer": { "type": "string" },
+        "position": { "$ref": "#/definitions/point" },
+        "name": { "type": "string" },
+        "handle": {
+          "description": "A handle is a hexadecimal number that is a unique tag for each entity in a drawing or DXF file. There must be no duplicate handles",
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["handle", "type", "layer"]
+    },
+
+    "entityAttDef": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "ATTDEF"
+        },
+        "scale": { "type": "number" },
+        "textStyle": { "type": "string" },
+        "layer": { "type": "string" },
+        "startPoint": {  "$ref": "#/definitions/point" },
+        "endPoint": {  "$ref": "#/definitions/point" },
+        "textHeight": { "type": "number" },
+        "text": { "type": "string" },
+        "tag": { "type": "string" },
+        "prompt": { "type": "string" },
+        "invisible": { "type": "boolean" },
+        "constant":  { "type": "boolean" },
+        "verificationRequired":  { "type": "boolean" },
+        "preset":  { "type": "boolean" },
+        "horizontalJustification":  { "type": "number" },
+        "handle": { "type": "integer" }
+      },
+      "additionalProperties": false,
+      "required": ["handle", "type", "layer"]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+    "rules": {
+        "no-console": false,
+        "member-access": false
+    },
+    "extends": [
+        "tslint:latest",
+        "tslint-config-prettier"
+    ]
+
+}
