@@ -29,8 +29,8 @@
         "x": { "type": "number" },
         "y": { "type": "number" }
       },
-      "additionalProperties": false
-
+      "additionalProperties": false,
+      "required": ["x", "y"]
     },
 
     "vertex": {
@@ -68,7 +68,7 @@
 
     "blockEntity": {
       "type": "object",
-      "oneOf": [{ "$ref": "#/definitions/entityText" }, { "$ref": "#/definitions/entityPoint" }, { "$ref": "#/definitions/entityPolyline" }, { "$ref": "#/definitions/entityLine" }, { "$ref": "#/definitions/entityAttDef" }]
+      "oneOf": [{ "$ref": "#/definitions/entityText" }, { "$ref": "#/definitions/entityPoint" }, { "$ref": "#/definitions/entityPolyline" }, { "$ref": "#/definitions/entityLine" }, { "$ref": "#/definitions/entityAttDef" }, { "$ref": "#/definitions/entityInsert" }]
     },
 
     "entityPolyline": {

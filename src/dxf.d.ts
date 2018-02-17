@@ -4,7 +4,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type BlockEntity = EntityText | EntityPoint | EntityPolyline | EntityLine | EntityAttDef;
+export type BlockEntity = EntityText | EntityPoint | EntityPolyline | EntityLine | EntityAttDef | EntityInsert;
 
 export interface DxfSchema {
   header: {};
@@ -22,8 +22,8 @@ export interface Block {
   handle: number;
 }
 export interface Point {
-  x?: number;
-  y?: number;
+  x: number;
+  y: number;
 }
 export interface EntityText {
   type: "TEXT";
