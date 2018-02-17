@@ -36,7 +36,7 @@
     "vertex": {
       "type": "object",
       "properties": {
-        "type": { "type": "string", "const": "VERTEX" },
+        "type": { "type": "string", "enum": ["VERTEX"] },
         "x": { "type": "number" },
         "y": { "type": "number" },
         "layer": { "type": "string" }
@@ -76,7 +76,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "const": "POLYLINE"
+          "enum": ["POLYLINE"]
         },
         "vertices": {
           "type": "array",
@@ -102,7 +102,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "const": "LINE"
+          "enum": ["LINE"]
         },
         "vertices": {
           "type": "array",
@@ -122,7 +122,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "const": "POINT"
+          "enum": ["POINT"]
         },
         "position": {
           "$ref": "#/definitions/point"
@@ -141,7 +141,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "const": "TEXT"
+          "enum": ["TEXT"]
         },
         "layer": { "type": "string" },
         "style": { "type": "string" },
@@ -163,7 +163,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "const": "INSERT"
+          "enum": ["INSERT"]
         },
         "layer": { "type": "string" },
         "position": { "$ref": "#/definitions/point" },
@@ -182,7 +182,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "const": "ATTDEF"
+          "enum": ["ATTDEF"]
         },
         "scale": { "type": "number" },
         "textStyle": { "type": "string" },

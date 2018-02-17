@@ -1,4 +1,5 @@
 const j2t = require('json-schema-to-typescript')
 const fs = require('fs')
+const schema = require("./dxf.json")
 // compile from file
-j2t.compileFromFile('dxf.json').then(ts => fs.writeFileSync('dxf.d.ts', ts))
+j2t.compile(schema).then(ts => fs.writeFileSync('../src/dxf.d.ts', ts))
