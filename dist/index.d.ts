@@ -1,5 +1,6 @@
 /// <reference types="node" />
 import * as fs from 'fs';
+import { Diagnostic } from './lib/Diagnostic';
 export interface IPatternPiece {
     name: string;
     shapes: object;
@@ -11,11 +12,17 @@ export interface IOpenPatternFormat {
     vertices: number[];
     baseSize: number;
 }
+export interface IReturnValue {
+    data: IOpenPatternFormat;
+    diagnostics: Diagnostic[];
+}
 declare class ASTMParser {
     vertices: number[];
     count: number;
-    parseStream(stream: fs.ReadStream, callback: (err: Error, msg: IOpenPatternFormat) => void): void;
+    diagnostics: Diagnostic[];
+    parseStream(stream: fs.ReadStream, callback: (err: Error, msg: IReturnValue) => void): void;
     private _transform(callback, err, dxf);
+    private _checkBlock(entities);
     private _getVertexIndex(vertex);
     private _findKey(entities, key);
     private _createBoundery(entities);

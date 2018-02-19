@@ -2,6 +2,22 @@
 import * as DXFParser from 'dxf-parser'
 import * as fs from 'fs'
 import * as DXF from './dxf'
+import { Diagnostic, Severity } from './lib/Diagnostic'
+
+const enum ASTMLayers {
+  Boundery = 1,
+  TurnPoints = 2,
+  CurvePoints = 3,
+  Notches = 4,
+  GradeReference = 5,
+  MirrorLine = 6,
+  GrainLine = 7,
+  InternalLines = 8,
+  DrillHoles = 13,
+  AnnotationText = 15,
+  ASTMBoundery = 84,
+  ASTMInternalLines = 85
+}
 
 interface IVertex {
   x: number
@@ -27,11 +43,17 @@ export interface IOpenPatternFormat {
   baseSize: number
 }
 
+export interface IReturnValue {
+  data: IOpenPatternFormat
+  diagnostics: Diagnostic[]
+}
+
 class ASTMParser {
   vertices: number[] = []
   count = 0
+  diagnostics: Diagnostic[] = []
 
-  parseStream(stream: fs.ReadStream, callback: (err: Error, msg: IOpenPatternFormat) => void) {
+  parseStream(stream: fs.ReadStream, callback: (err: Error, msg: IReturnValue) => void) {
     try {
       const parser = new DXFParser()
       parser.parseStream(stream, this._transform.bind(this, callback))
@@ -40,45 +62,96 @@ class ASTMParser {
     }
   }
 
-  private _transform(callback: (err: Error, msg?: IOpenPatternFormat) => void, err: Error, dxf: DXF.DxfSchema) {
+  private _transform(callback: (err: Error, msg?: IReturnValue) => void, err: Error, dxf: DXF.DxfSchema) {
     if (err) {
       callback(err)
     }
 
     const pieceMap = new Map()
     const sizeSet = new Set()
+    let foundError = false
 
     Object.keys(dxf.blocks).forEach(key => {
-      const value = dxf.blocks[key]
+      const block = dxf.blocks[key]
 
-      const size = +this._findKey(value.entities, 'size')
+      const size = +this._findKey(block.entities, 'size')
       if (size !== null) {
         sizeSet.add(size)
       }
 
-      const name = this._findKey(value.entities, 'piece name')
+      const name = this._findKey(block.entities, 'piece name')
       if (name === null) {
-        // TODO: Error handling
+        this.diagnostics.push(new Diagnostic(Severity.ERROR, 'Missing required field piece name', block))
+        foundError = true
+        return
       }
       let actualPiece = pieceMap.get(name)
       if (!actualPiece) {
         actualPiece = { name, shapes: {}, internalShapes: {} }
         pieceMap.set(name, actualPiece)
       }
-      actualPiece.shapes[size] = this._createBoundery(value.entities)
-      actualPiece.internalShapes[size] = this._createInternalShapes(value.entities)
+      actualPiece.shapes[size] = this._createBoundery(block.entities)
+      actualPiece.internalShapes[size] = this._createInternalShapes(block.entities)
+      this._checkBlock(block.entities)
     })
 
     const baseSizeStr = this._findKey(dxf.entities, 'sample size')
     const baseSize = baseSizeStr ? +baseSizeStr : 36
 
     // console.log(this.count)
+    err = foundError ? new Error(this.diagnostics.map(diag => diag.message).join('\n')) : null
+    const ret: IReturnValue = {
+      data: {
+        baseSize,
+        pieces: Array.from(pieceMap.values()),
+        sizes: Array.from(sizeSet).sort(),
+        vertices: this.vertices
+      },
+      diagnostics: this.diagnostics
+    }
 
-    callback(err, {
-      baseSize,
-      pieces: Array.from(pieceMap.values()),
-      sizes: Array.from(sizeSet).sort(),
-      vertices: this.vertices
+    callback(err, ret)
+  }
+
+  private _checkBlock(entities: DXF.BlockEntity[]) {
+    entities.forEach(entity => {
+      switch (+entity.layer) {
+        case ASTMLayers.Boundery:
+        case ASTMLayers.InternalLines:
+          break
+        case ASTMLayers.Notches:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Notches`, entity))
+          break
+        case ASTMLayers.GradeReference:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grade Reference`, entity))
+          break
+        case ASTMLayers.TurnPoints:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Turn Points`, entity))
+          break
+        case ASTMLayers.CurvePoints:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Turn Points`, entity))
+          break
+        case ASTMLayers.GrainLine:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grain Lines`, entity))
+          break
+        case ASTMLayers.AnnotationText:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity))
+          break
+        case ASTMLayers.ASTMBoundery:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Boundery`, entity))
+          break
+        case ASTMLayers.ASTMInternalLines:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Internal Lines`, entity))
+          break
+        case ASTMLayers.MirrorLine:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Mirror Line`, entity))
+          break
+        case ASTMLayers.DrillHoles:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Drill Holes`, entity))
+          break
+        default:
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: `, entity))
+      }
     })
   }
 
@@ -100,17 +173,19 @@ class ASTMParser {
   }
 
   private _findKey(entities: DXF.BlockEntity[], key: string): string | null {
-    const candidate = entities.find(entity => {
-      if (isText(entity)) {
+    for (const entity of entities) {
+      if (entity.type === 'TEXT') {
         const result = getTextKeyValue(entity)
         if (!result) {
-          return false
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, 'Unexpected sytax in key-value text string: ' + entity.text, entity))
+          continue
         }
-        return result.key.toLowerCase() === key
+        if (result.key.toLowerCase() === key) {
+          return result.value
+        }
       }
-      return false
-    })
-    return candidate ? getTextKeyValue(candidate).value : null
+    }
+    return null
   }
 
   private _createBoundery(entities: DXF.BlockEntity[]) {
@@ -119,10 +194,7 @@ class ASTMParser {
       metadata: {},
       vertices: []
     }
-    entities.forEach(entity => {
-      if (+entity.layer !== 1) {
-        return
-      }
+    entities.filter(entity => entity.layer === ASTMLayers.Boundery.toString()).forEach(entity => {
       switch (entity.type) {
         case 'POLYLINE':
           shape.lengths.push(entity.vertices.length)
@@ -144,7 +216,7 @@ class ASTMParser {
           metadata.astm.push(entity.text)
           break
         default:
-        // console.warn('Non polyline boundery', entity.type)
+        // this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in boundery shape: '${entity.type}'`, entity))
       }
     })
 
@@ -157,7 +229,7 @@ class ASTMParser {
       metadata: {},
       vertices: []
     }
-    entities.filter(entity => +entity.layer === 8).forEach(entity => {
+    entities.filter(entity => entity.layer === ASTMLayers.InternalLines.toString()).forEach(entity => {
       switch (entity.type) {
         case 'POLYLINE':
           shape.lengths.push(entity.vertices.length)
@@ -180,7 +252,7 @@ class ASTMParser {
           metadata.astm.push(entity.text)
           break
         default:
-          console.warn('Unexpected type in internal shape:', entity.type)
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity))
       }
     })
 

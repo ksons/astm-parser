@@ -2,10 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 // @ts-ignore
 const DXFParser = require("dxf-parser");
+const Diagnostic_1 = require("./lib/Diagnostic");
 class ASTMParser {
     constructor() {
         this.vertices = [];
         this.count = 0;
+        this.diagnostics = [];
     }
     parseStream(stream, callback) {
         try {
@@ -22,32 +24,82 @@ class ASTMParser {
         }
         const pieceMap = new Map();
         const sizeSet = new Set();
+        let foundError = false;
         Object.keys(dxf.blocks).forEach(key => {
-            const value = dxf.blocks[key];
-            const size = +this._findKey(value.entities, 'size');
+            const block = dxf.blocks[key];
+            const size = +this._findKey(block.entities, 'size');
             if (size !== null) {
                 sizeSet.add(size);
             }
-            const name = this._findKey(value.entities, 'piece name');
+            const name = this._findKey(block.entities, 'piece name');
             if (name === null) {
-                // TODO: Error handling
+                this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.ERROR, 'Missing required field piece name', block));
+                foundError = true;
+                return;
             }
             let actualPiece = pieceMap.get(name);
             if (!actualPiece) {
                 actualPiece = { name, shapes: {}, internalShapes: {} };
                 pieceMap.set(name, actualPiece);
             }
-            actualPiece.shapes[size] = this._createBoundery(value.entities);
-            actualPiece.internalShapes[size] = this._createInternalShapes(value.entities);
+            actualPiece.shapes[size] = this._createBoundery(block.entities);
+            actualPiece.internalShapes[size] = this._createInternalShapes(block.entities);
+            this._checkBlock(block.entities);
         });
         const baseSizeStr = this._findKey(dxf.entities, 'sample size');
         const baseSize = baseSizeStr ? +baseSizeStr : 36;
         // console.log(this.count)
-        callback(err, {
-            baseSize,
-            pieces: Array.from(pieceMap.values()),
-            sizes: Array.from(sizeSet).sort(),
-            vertices: this.vertices
+        err = foundError ? new Error(this.diagnostics.map(diag => diag.message).join('\n')) : null;
+        const ret = {
+            data: {
+                baseSize,
+                pieces: Array.from(pieceMap.values()),
+                sizes: Array.from(sizeSet).sort(),
+                vertices: this.vertices
+            },
+            diagnostics: this.diagnostics
+        };
+        callback(err, ret);
+    }
+    _checkBlock(entities) {
+        entities.forEach(entity => {
+            switch (+entity.layer) {
+                case 1 /* Boundery */:
+                case 8 /* InternalLines */:
+                    break;
+                case 4 /* Notches */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Notches`, entity));
+                    break;
+                case 5 /* GradeReference */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grade Reference`, entity));
+                    break;
+                case 2 /* TurnPoints */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Turn Points`, entity));
+                    break;
+                case 3 /* CurvePoints */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Turn Points`, entity));
+                    break;
+                case 7 /* GrainLine */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grain Lines`, entity));
+                    break;
+                case 15 /* AnnotationText */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity));
+                    break;
+                case 84 /* ASTMBoundery */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Boundery`, entity));
+                    break;
+                case 85 /* ASTMInternalLines */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Internal Lines`, entity));
+                    break;
+                case 6 /* MirrorLine */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Mirror Line`, entity));
+                    break;
+                case 13 /* DrillHoles */:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Drill Holes`, entity));
+                    break;
+                default:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: `, entity));
+            }
         });
     }
     _getVertexIndex(vertex) {
@@ -65,17 +117,19 @@ class ASTMParser {
         return this.vertices.length / 2 - 1;
     }
     _findKey(entities, key) {
-        const candidate = entities.find(entity => {
-            if (isText(entity)) {
+        for (const entity of entities) {
+            if (entity.type === 'TEXT') {
                 const result = getTextKeyValue(entity);
                 if (!result) {
-                    return false;
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, 'Unexpected sytax in key-value text string: ' + entity.text, entity));
+                    continue;
                 }
-                return result.key.toLowerCase() === key;
+                if (result.key.toLowerCase() === key) {
+                    return result.value;
+                }
             }
-            return false;
-        });
-        return candidate ? getTextKeyValue(candidate).value : null;
+        }
+        return null;
     }
     _createBoundery(entities) {
         const shape = {
@@ -83,10 +137,7 @@ class ASTMParser {
             metadata: {},
             vertices: []
         };
-        entities.forEach(entity => {
-            if (+entity.layer !== 1) {
-                return;
-            }
+        entities.filter(entity => entity.layer === 1 /* Boundery */.toString()).forEach(entity => {
             switch (entity.type) {
                 case 'POLYLINE':
                     shape.lengths.push(entity.vertices.length);
@@ -118,7 +169,7 @@ class ASTMParser {
             metadata: {},
             vertices: []
         };
-        entities.filter(entity => +entity.layer === 8).forEach(entity => {
+        entities.filter(entity => entity.layer === 8 /* InternalLines */.toString()).forEach(entity => {
             switch (entity.type) {
                 case 'POLYLINE':
                     shape.lengths.push(entity.vertices.length);
@@ -141,7 +192,7 @@ class ASTMParser {
                     metadata.astm.push(entity.text);
                     break;
                 default:
-                    console.warn('Unexpected type in internal shape:', entity.type);
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity));
             }
         });
         return shape;
