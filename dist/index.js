@@ -39,11 +39,15 @@ class ASTMParser {
             }
             let actualPiece = pieceMap.get(name);
             if (!actualPiece) {
-                actualPiece = { name, shapes: {}, internalShapes: {} };
+                actualPiece = { name, shapes: {}, internalShapes: {}, turnPoints: {}, curvePoints: {}, grainLines: {}, notches: {} };
                 pieceMap.set(name, actualPiece);
             }
             actualPiece.shapes[size] = this._createBoundery(block.entities);
             actualPiece.internalShapes[size] = this._createInternalShapes(block.entities);
+            actualPiece.turnPoints[size] = this._createPoints(block.entities, 2 /* TurnPoints */);
+            actualPiece.curvePoints[size] = this._createPoints(block.entities, 3 /* CurvePoints */);
+            actualPiece.notches[size] = this._createPoints(block.entities, 4 /* Notches */);
+            actualPiece.grainLines[size] = this._createLines(block.entities, 7 /* GrainLine */);
             this._checkBlock(block.entities);
         });
         const baseSizeStr = this._findKey(dxf.entities, 'sample size');
@@ -66,21 +70,13 @@ class ASTMParser {
             switch (+entity.layer) {
                 case 1 /* Boundery */:
                 case 8 /* InternalLines */:
-                    break;
+                case 2 /* TurnPoints */:
+                case 3 /* CurvePoints */:
+                case 7 /* GrainLine */:
                 case 4 /* Notches */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Notches`, entity));
                     break;
                 case 5 /* GradeReference */:
                     this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grade Reference`, entity));
-                    break;
-                case 2 /* TurnPoints */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Turn Points`, entity));
-                    break;
-                case 3 /* CurvePoints */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Turn Points`, entity));
-                    break;
-                case 7 /* GrainLine */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grain Lines`, entity));
                     break;
                 case 15 /* AnnotationText */:
                     this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity));
@@ -130,6 +126,60 @@ class ASTMParser {
             }
         }
         return null;
+    }
+    _createLines(entities, layer) {
+        const shape = {
+            lengths: [],
+            metadata: {},
+            vertices: []
+        };
+        entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
+            switch (entity.type) {
+                case 'LINE':
+                    if (entity.vertices.length !== 2) {
+                        this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Found line with more than 2 vertices: '${entity.vertices.length}'`, entity.vertices));
+                    }
+                    shape.lengths.push(2);
+                    shape.vertices.push(this._getVertexIndex(entity.vertices[0]));
+                    shape.vertices.push(this._getVertexIndex(entity.vertices[1]));
+                    break;
+                case 'TEXT':
+                    const metadata = shape.metadata;
+                    if (!metadata.astm) {
+                        metadata.astm = [];
+                    }
+                    metadata.astm.push(entity.text);
+                    break;
+                default:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity));
+            }
+        });
+        return shape;
+    }
+    _createPoints(entities, layer) {
+        const shape = {
+            lengths: [],
+            metadata: {},
+            vertices: []
+        };
+        entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
+            switch (entity.type) {
+                case 'POINT':
+                    shape.lengths.push(1);
+                    shape.vertices.push(this._getVertexIndex(entity.position));
+                    break;
+                case 'TEXT':
+                    const metadata = shape.metadata;
+                    if (!metadata.astm) {
+                        metadata.astm = [];
+                    }
+                    metadata.astm.push(entity.text);
+                    break;
+                default:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
+            }
+        });
+        return shape;
     }
     _createBoundery(entities) {
         const shape = {

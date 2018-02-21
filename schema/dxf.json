@@ -133,7 +133,7 @@
         "thickness": { "type": "number" }
       },
       "additionalProperties": false,
-      "required": ["handle", "type", "layer"]
+      "required": ["handle", "type", "layer", "position"]
     },
 
     "entityText": {

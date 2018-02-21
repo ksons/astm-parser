@@ -34,6 +34,10 @@ export interface IPatternPiece {
   name: string
   shapes: object
   internalShapes: object
+  turnPoints: object
+  curvePoints: object
+  grainLines: object
+  notches: object
 }
 
 export interface IOpenPatternFormat {
@@ -87,11 +91,15 @@ class ASTMParser {
       }
       let actualPiece = pieceMap.get(name)
       if (!actualPiece) {
-        actualPiece = { name, shapes: {}, internalShapes: {} }
+        actualPiece = { name, shapes: {}, internalShapes: {}, turnPoints: {}, curvePoints: {}, grainLines: {}, notches: {} }
         pieceMap.set(name, actualPiece)
       }
       actualPiece.shapes[size] = this._createBoundery(block.entities)
       actualPiece.internalShapes[size] = this._createInternalShapes(block.entities)
+      actualPiece.turnPoints[size] = this._createPoints(block.entities, ASTMLayers.TurnPoints)
+      actualPiece.curvePoints[size] = this._createPoints(block.entities, ASTMLayers.CurvePoints)
+      actualPiece.notches[size] = this._createPoints(block.entities, ASTMLayers.Notches)
+      actualPiece.grainLines[size] = this._createLines(block.entities, ASTMLayers.GrainLine)
       this._checkBlock(block.entities)
     })
 
@@ -118,21 +126,13 @@ class ASTMParser {
       switch (+entity.layer) {
         case ASTMLayers.Boundery:
         case ASTMLayers.InternalLines:
-          break
+        case ASTMLayers.TurnPoints:
+        case ASTMLayers.CurvePoints:
+        case ASTMLayers.GrainLine:
         case ASTMLayers.Notches:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Notches`, entity))
           break
         case ASTMLayers.GradeReference:
           this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grade Reference`, entity))
-          break
-        case ASTMLayers.TurnPoints:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Turn Points`, entity))
-          break
-        case ASTMLayers.CurvePoints:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Turn Points`, entity))
-          break
-        case ASTMLayers.GrainLine:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grain Lines`, entity))
           break
         case ASTMLayers.AnnotationText:
           this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity))
@@ -186,6 +186,62 @@ class ASTMParser {
       }
     }
     return null
+  }
+
+  private _createLines(entities: DXF.BlockEntity[], layer: ASTMLayers) {
+    const shape: IShape = {
+      lengths: [],
+      metadata: {},
+      vertices: []
+    }
+    entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
+      switch (entity.type) {
+        case 'LINE':
+          if (entity.vertices.length !== 2) {
+            this.diagnostics.push(new Diagnostic(Severity.WARNING, `Found line with more than 2 vertices: '${entity.vertices.length}'`, entity.vertices))
+          }
+          shape.lengths.push(2)
+          shape.vertices.push(this._getVertexIndex(entity.vertices[0]))
+          shape.vertices.push(this._getVertexIndex(entity.vertices[1]))
+          break
+        case 'TEXT':
+          const metadata = shape.metadata
+          if (!metadata.astm) {
+            metadata.astm = []
+          }
+          metadata.astm.push(entity.text)
+          break
+        default:
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity))
+      }
+    })
+    return shape
+  }
+
+  private _createPoints(entities: DXF.BlockEntity[], layer: ASTMLayers) {
+    const shape: IShape = {
+      lengths: [],
+      metadata: {},
+      vertices: []
+    }
+    entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
+      switch (entity.type) {
+        case 'POINT':
+          shape.lengths.push(1)
+          shape.vertices.push(this._getVertexIndex(entity.position))
+          break
+        case 'TEXT':
+          const metadata = shape.metadata
+          if (!metadata.astm) {
+            metadata.astm = []
+          }
+          metadata.astm.push(entity.text)
+          break
+        default:
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity))
+      }
+    })
+    return shape
   }
 
   private _createBoundery(entities: DXF.BlockEntity[]) {

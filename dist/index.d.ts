@@ -5,6 +5,10 @@ export interface IPatternPiece {
     name: string;
     shapes: object;
     internalShapes: object;
+    turnPoints: object;
+    curvePoints: object;
+    grainLines: object;
+    notches: object;
 }
 export interface IOpenPatternFormat {
     pieces: IPatternPiece[];
@@ -25,6 +29,8 @@ declare class ASTMParser {
     private _checkBlock(entities);
     private _getVertexIndex(vertex);
     private _findKey(entities, key);
+    private _createLines(entities, layer);
+    private _createPoints(entities, layer);
     private _createBoundery(entities);
     private _createInternalShapes(entities);
 }

@@ -40,7 +40,7 @@ export interface EntityText {
 }
 export interface EntityPoint {
   type: "POINT";
-  position?: Point;
+  position: Point;
   layer: string;
   handle: number;
   angle?: number;
