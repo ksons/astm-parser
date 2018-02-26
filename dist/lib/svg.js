@@ -91,6 +91,7 @@ parser.parseStream(fileStream, (err, res) => {
         let curvePoints = [];
         let grainLines = [];
         let notches = [];
+        let gradeReferences = [];
         data.sizes.forEach(size => {
             const isBaseSize = size === baseSize;
             const id = piece.name + '-' + size;
@@ -121,6 +122,10 @@ parser.parseStream(fileStream, (err, res) => {
             grainLines = grainLines.concat(gl.map((dStr, idx) => {
                 return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="black"/>`;
             }));
+            const grl = generateSegmentsFromShape(piece.gradeReferences[size], data.vertices, bbox);
+            gradeReferences = gradeReferences.concat(grl.map((dStr, idx) => {
+                return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="green"/>`;
+            }));
         });
         layerStr += `<g id="layer${layerCount++}" inkscape:label="${piece.name}" inkscape:groupmode="layer">`;
         layerStr += bounderies.join();
@@ -147,6 +152,11 @@ parser.parseStream(fileStream, (err, res) => {
         if (notches.length) {
             layerStr += `<g id="layer${layerCount++}" inkscape:label="${piece.name} notches" inkscape:groupmode="layer">`;
             layerStr += notches.join();
+            layerStr += '</g>';
+        }
+        if (gradeReferences.length) {
+            layerStr += `<g id="layer${layerCount++}" inkscape:label="${piece.name} gradeReference" inkscape:groupmode="layer">`;
+            layerStr += gradeReferences.join();
             layerStr += '</g>';
         }
         layerStr += '</g>';

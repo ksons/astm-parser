@@ -9,6 +9,7 @@ export interface IPatternPiece {
     curvePoints: object;
     grainLines: object;
     notches: object;
+    gradeReferences: object;
 }
 export interface IOpenPatternFormat {
     pieces: IPatternPiece[];

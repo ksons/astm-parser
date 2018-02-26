@@ -38,6 +38,7 @@ export interface IPatternPiece {
   curvePoints: object
   grainLines: object
   notches: object
+  gradeReferences: object
 }
 
 export interface IOpenPatternFormat {
@@ -91,7 +92,7 @@ class ASTMParser {
       }
       let actualPiece = pieceMap.get(name)
       if (!actualPiece) {
-        actualPiece = { name, shapes: {}, internalShapes: {}, turnPoints: {}, curvePoints: {}, grainLines: {}, notches: {} }
+        actualPiece = { name, shapes: {}, internalShapes: {}, turnPoints: {}, curvePoints: {}, grainLines: {}, notches: {}, gradeReferences: {} }
         pieceMap.set(name, actualPiece)
       }
       actualPiece.shapes[size] = this._createBoundery(block.entities)
@@ -100,6 +101,7 @@ class ASTMParser {
       actualPiece.curvePoints[size] = this._createPoints(block.entities, ASTMLayers.CurvePoints)
       actualPiece.notches[size] = this._createPoints(block.entities, ASTMLayers.Notches)
       actualPiece.grainLines[size] = this._createLines(block.entities, ASTMLayers.GrainLine)
+      actualPiece.gradeReferences[size] = this._createLines(block.entities, ASTMLayers.GradeReference)
       this._checkBlock(block.entities)
     })
 
@@ -130,9 +132,7 @@ class ASTMParser {
         case ASTMLayers.CurvePoints:
         case ASTMLayers.GrainLine:
         case ASTMLayers.Notches:
-          break
         case ASTMLayers.GradeReference:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grade Reference`, entity))
           break
         case ASTMLayers.AnnotationText:
           this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity))

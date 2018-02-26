@@ -39,7 +39,7 @@ class ASTMParser {
             }
             let actualPiece = pieceMap.get(name);
             if (!actualPiece) {
-                actualPiece = { name, shapes: {}, internalShapes: {}, turnPoints: {}, curvePoints: {}, grainLines: {}, notches: {} };
+                actualPiece = { name, shapes: {}, internalShapes: {}, turnPoints: {}, curvePoints: {}, grainLines: {}, notches: {}, gradeReferences: {} };
                 pieceMap.set(name, actualPiece);
             }
             actualPiece.shapes[size] = this._createBoundery(block.entities);
@@ -48,6 +48,7 @@ class ASTMParser {
             actualPiece.curvePoints[size] = this._createPoints(block.entities, 3 /* CurvePoints */);
             actualPiece.notches[size] = this._createPoints(block.entities, 4 /* Notches */);
             actualPiece.grainLines[size] = this._createLines(block.entities, 7 /* GrainLine */);
+            actualPiece.gradeReferences[size] = this._createLines(block.entities, 5 /* GradeReference */);
             this._checkBlock(block.entities);
         });
         const baseSizeStr = this._findKey(dxf.entities, 'sample size');
@@ -74,9 +75,7 @@ class ASTMParser {
                 case 3 /* CurvePoints */:
                 case 7 /* GrainLine */:
                 case 4 /* Notches */:
-                    break;
                 case 5 /* GradeReference */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Grade Reference`, entity));
                     break;
                 case 15 /* AnnotationText */:
                     this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity));
