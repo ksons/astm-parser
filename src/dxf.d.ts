@@ -26,7 +26,7 @@ export interface Point {
   y: number;
 }
 export interface EntityText {
-  type: "TEXT";
+  type: 'TEXT';
   layer: string;
   style?: string;
   startPoint?: Point;
@@ -39,7 +39,7 @@ export interface EntityText {
   handle: number;
 }
 export interface EntityPoint {
-  type: "POINT";
+  type: 'POINT';
   position: Point;
   layer: string;
   handle: number;
@@ -47,7 +47,7 @@ export interface EntityPoint {
   thickness?: number;
 }
 export interface EntityPolyline {
-  type: "POLYLINE";
+  type: 'POLYLINE';
   vertices?: Vertex[];
   layer: string;
   shape?: boolean;
@@ -61,19 +61,19 @@ export interface EntityPolyline {
   handle: number;
 }
 export interface Vertex {
-  type: "VERTEX";
+  type: 'VERTEX';
   x: number;
   y: number;
   layer: string;
 }
 export interface EntityLine {
-  type: "LINE";
+  type: 'LINE';
   vertices?: Point[];
   layer: string;
   handle: number;
 }
 export interface EntityAttDef {
-  type: "ATTDEF";
+  type: 'ATTDEF';
   scale?: number;
   textStyle?: string;
   layer: string;
@@ -91,7 +91,7 @@ export interface EntityAttDef {
   handle: number;
 }
 export interface EntityInsert {
-  type: "INSERT";
+  type: 'INSERT';
   layer: string;
   position?: Point;
   name?: string;

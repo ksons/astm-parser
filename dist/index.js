@@ -27,7 +27,7 @@ class ASTMParser {
         let foundError = false;
         Object.keys(dxf.blocks).forEach(key => {
             const block = dxf.blocks[key];
-            const size = +this._findKey(block.entities, 'size');
+            const size = this._findKey(block.entities, 'size');
             if (size !== null) {
                 sizeSet.add(size);
             }
@@ -39,7 +39,16 @@ class ASTMParser {
             }
             let actualPiece = pieceMap.get(name);
             if (!actualPiece) {
-                actualPiece = { name, shapes: {}, internalShapes: {}, turnPoints: {}, curvePoints: {}, grainLines: {}, notches: {}, gradeReferences: {} };
+                actualPiece = {
+                    curvePoints: {},
+                    gradeReferences: {},
+                    grainLines: {},
+                    internalShapes: {},
+                    name,
+                    notches: {},
+                    shapes: {},
+                    turnPoints: {}
+                };
                 pieceMap.set(name, actualPiece);
             }
             actualPiece.shapes[size] = this._createBoundery(block.entities);
@@ -52,11 +61,19 @@ class ASTMParser {
             this._checkBlock(block.entities);
         });
         const baseSizeStr = this._findKey(dxf.entities, 'sample size');
-        const baseSize = baseSizeStr ? +baseSizeStr : 36;
-        // console.log(this.count)
+        const baseSize = baseSizeStr ? baseSizeStr : 'M';
+        const asset = {
+            authoringTool: this._findKey(dxf.entities, 'product'),
+            authoringToolVersion: this._findKey(dxf.entities, 'version'),
+            authoringVendor: this._findKey(dxf.entities, 'author'),
+            creationDate: this._findKey(dxf.entities, 'creation date'),
+            creationTime: this._findKey(dxf.entities, 'creation time')
+        };
+        // console.log(asset);
         err = foundError ? new Error(this.diagnostics.map(diag => diag.message).join('\n')) : null;
         const ret = {
             data: {
+                asset,
                 baseSize,
                 pieces: Array.from(pieceMap.values()),
                 sizes: Array.from(sizeSet).sort(),
@@ -116,22 +133,19 @@ class ASTMParser {
             if (entity.type === 'TEXT') {
                 const result = getTextKeyValue(entity);
                 if (!result) {
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, 'Unexpected sytax in key-value text string: ' + entity.text, entity));
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, 'Unexpected syntax in key-value text string: ' + entity.text, entity));
                     continue;
                 }
+                // console.log(result)
                 if (result.key.toLowerCase() === key) {
                     return result.value;
                 }
             }
         }
-        return null;
+        return '';
     }
     _createLines(entities, layer) {
-        const shape = {
-            lengths: [],
-            metadata: {},
-            vertices: []
-        };
+        const shape = { lengths: [], metadata: {}, vertices: [] };
         entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
             switch (entity.type) {
                 case 'LINE':
@@ -156,11 +170,7 @@ class ASTMParser {
         return shape;
     }
     _createPoints(entities, layer) {
-        const shape = {
-            lengths: [],
-            metadata: {},
-            vertices: []
-        };
+        const shape = { lengths: [], metadata: {}, vertices: [] };
         entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
             switch (entity.type) {
                 case 'POINT':
@@ -181,11 +191,7 @@ class ASTMParser {
         return shape;
     }
     _createBoundery(entities) {
-        const shape = {
-            lengths: [],
-            metadata: {},
-            vertices: []
-        };
+        const shape = { lengths: [], metadata: {}, vertices: [] };
         entities.filter(entity => entity.layer === 1 /* Boundery */.toString()).forEach(entity => {
             switch (entity.type) {
                 case 'POLYLINE':
@@ -213,11 +219,7 @@ class ASTMParser {
         return shape;
     }
     _createInternalShapes(entities) {
-        const shape = {
-            lengths: [],
-            metadata: {},
-            vertices: []
-        };
+        const shape = { lengths: [], metadata: {}, vertices: [] };
         entities.filter(entity => entity.layer === 8 /* InternalLines */.toString()).forEach(entity => {
             switch (entity.type) {
                 case 'POLYLINE':

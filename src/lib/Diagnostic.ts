@@ -5,14 +5,14 @@ export enum Severity {
 }
 
 export class Diagnostic {
-  children: Diagnostic[]
-  message: string
-  data: any
-  severity: Severity
+  children: Diagnostic[];
+  message: string;
+  data: any;
+  severity: Severity;
 
   constructor(sev: Severity, mess: string, d?: any) {
-    this.severity = sev
-    this.message = mess
-    this.data = d
+    this.severity = sev;
+    this.message = mess;
+    this.data = d;
   }
 }

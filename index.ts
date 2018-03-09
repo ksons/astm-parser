@@ -1,1 +1,1 @@
-export { ASTMParser } from './src/index'
+export { ASTMParser } from './src/index';

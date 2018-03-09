@@ -1,6 +1,13 @@
 /// <reference types="node" />
 import * as fs from 'fs';
 import { Diagnostic } from './lib/Diagnostic';
+export interface IAsset {
+    authoringTool: string;
+    authoringToolVersion: string;
+    authoringVendor: string;
+    creationDate: string;
+    creationTime: string;
+}
 export interface IPatternPiece {
     name: string;
     shapes: object;
@@ -12,10 +19,11 @@ export interface IPatternPiece {
     gradeReferences: object;
 }
 export interface IOpenPatternFormat {
+    asset: IAsset;
     pieces: IPatternPiece[];
-    sizes: number[];
+    sizes: string[];
     vertices: number[];
-    baseSize: number;
+    baseSize: string;
 }
 export interface IReturnValue {
     data: IOpenPatternFormat;

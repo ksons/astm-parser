@@ -1,6 +1,6 @@
 interface IOpenPatternFormat {
-    header: string;
+  header: string;
 }
 declare class OpenPatternFormat implements IOpenPatternFormat {
-    header: string;
+  header: string;
 }

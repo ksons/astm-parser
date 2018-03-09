@@ -1,8 +1,8 @@
 // @ts-ignore
-import * as DXFParser from 'dxf-parser'
-import * as fs from 'fs'
-import * as DXF from './dxf'
-import { Diagnostic, Severity } from './lib/Diagnostic'
+import * as DXFParser from 'dxf-parser';
+import * as fs from 'fs';
+import * as DXF from './dxf';
+import { Diagnostic, Severity } from './lib/Diagnostic';
 
 const enum ASTMLayers {
   Boundery = 1,
@@ -20,107 +20,133 @@ const enum ASTMLayers {
 }
 
 interface IVertex {
-  x: number
-  y: number
+  x: number;
+  y: number;
 }
 
 interface IShape {
-  lengths: number[]
-  vertices: number[]
-  metadata?: any
+  lengths: number[];
+  vertices: number[];
+  metadata?: any;
+}
+
+export interface IAsset {
+  authoringTool: string;
+  authoringToolVersion: string;
+  authoringVendor: string;
+  creationDate: string;
+  creationTime: string;
 }
 
 export interface IPatternPiece {
-  name: string
-  shapes: object
-  internalShapes: object
-  turnPoints: object
-  curvePoints: object
-  grainLines: object
-  notches: object
-  gradeReferences: object
+  name: string;
+  shapes: object;
+  internalShapes: object;
+  turnPoints: object;
+  curvePoints: object;
+  grainLines: object;
+  notches: object;
+  gradeReferences: object;
 }
 
 export interface IOpenPatternFormat {
-  pieces: IPatternPiece[]
-  sizes: number[]
-  vertices: number[]
-  baseSize: number
+  asset: IAsset;
+  pieces: IPatternPiece[];
+  sizes: string[];
+  vertices: number[];
+  baseSize: string;
 }
 
 export interface IReturnValue {
-  data: IOpenPatternFormat
-  diagnostics: Diagnostic[]
+  data: IOpenPatternFormat;
+  diagnostics: Diagnostic[];
 }
 
 class ASTMParser {
-  vertices: number[] = []
-  count = 0
-  diagnostics: Diagnostic[] = []
+  vertices: number[] = [];
+  count = 0;
+  diagnostics: Diagnostic[] = [];
 
   parseStream(stream: fs.ReadStream, callback: (err: Error, msg: IReturnValue) => void) {
     try {
-      const parser = new DXFParser()
-      parser.parseStream(stream, this._transform.bind(this, callback))
+      const parser = new DXFParser();
+      parser.parseStream(stream, this._transform.bind(this, callback));
     } catch (e) {
-      console.log(e)
+      console.log(e);
     }
   }
 
   private _transform(callback: (err: Error, msg?: IReturnValue) => void, err: Error, dxf: DXF.DxfSchema) {
     if (err) {
-      callback(err)
+      callback(err);
     }
 
-    const pieceMap = new Map()
-    const sizeSet = new Set()
-    let foundError = false
+    const pieceMap = new Map();
+    const sizeSet = new Set();
+    let foundError = false;
 
     Object.keys(dxf.blocks).forEach(key => {
-      const block = dxf.blocks[key]
-
-      const size = +this._findKey(block.entities, 'size')
+      const block = dxf.blocks[key];
+      const size = this._findKey(block.entities, 'size');
       if (size !== null) {
-        sizeSet.add(size)
+        sizeSet.add(size);
       }
 
-      const name = this._findKey(block.entities, 'piece name')
+      const name = this._findKey(block.entities, 'piece name');
       if (name === null) {
-        this.diagnostics.push(new Diagnostic(Severity.ERROR, 'Missing required field piece name', block))
-        foundError = true
-        return
+        this.diagnostics.push(new Diagnostic(Severity.ERROR, 'Missing required field piece name', block));
+        foundError = true;
+        return;
       }
-      let actualPiece = pieceMap.get(name)
+      let actualPiece = pieceMap.get(name);
       if (!actualPiece) {
-        actualPiece = { name, shapes: {}, internalShapes: {}, turnPoints: {}, curvePoints: {}, grainLines: {}, notches: {}, gradeReferences: {} }
-        pieceMap.set(name, actualPiece)
+        actualPiece = {
+          curvePoints: {},
+          gradeReferences: {},
+          grainLines: {},
+          internalShapes: {},
+          name,
+          notches: {},
+          shapes: {},
+          turnPoints: {}
+        };
+        pieceMap.set(name, actualPiece);
       }
-      actualPiece.shapes[size] = this._createBoundery(block.entities)
-      actualPiece.internalShapes[size] = this._createInternalShapes(block.entities)
-      actualPiece.turnPoints[size] = this._createPoints(block.entities, ASTMLayers.TurnPoints)
-      actualPiece.curvePoints[size] = this._createPoints(block.entities, ASTMLayers.CurvePoints)
-      actualPiece.notches[size] = this._createPoints(block.entities, ASTMLayers.Notches)
-      actualPiece.grainLines[size] = this._createLines(block.entities, ASTMLayers.GrainLine)
-      actualPiece.gradeReferences[size] = this._createLines(block.entities, ASTMLayers.GradeReference)
-      this._checkBlock(block.entities)
-    })
+      actualPiece.shapes[size] = this._createBoundery(block.entities);
+      actualPiece.internalShapes[size] = this._createInternalShapes(block.entities);
+      actualPiece.turnPoints[size] = this._createPoints(block.entities, ASTMLayers.TurnPoints);
+      actualPiece.curvePoints[size] = this._createPoints(block.entities, ASTMLayers.CurvePoints);
+      actualPiece.notches[size] = this._createPoints(block.entities, ASTMLayers.Notches);
+      actualPiece.grainLines[size] = this._createLines(block.entities, ASTMLayers.GrainLine);
+      actualPiece.gradeReferences[size] = this._createLines(block.entities, ASTMLayers.GradeReference);
+      this._checkBlock(block.entities);
+    });
 
-    const baseSizeStr = this._findKey(dxf.entities, 'sample size')
-    const baseSize = baseSizeStr ? +baseSizeStr : 36
+    const baseSizeStr = this._findKey(dxf.entities, 'sample size');
+    const baseSize = baseSizeStr ? baseSizeStr : 'M';
 
-    // console.log(this.count)
-    err = foundError ? new Error(this.diagnostics.map(diag => diag.message).join('\n')) : null
+    const asset: IAsset = {
+      authoringTool: this._findKey(dxf.entities, 'product'),
+      authoringToolVersion: this._findKey(dxf.entities, 'version'),
+      authoringVendor: this._findKey(dxf.entities, 'author'),
+      creationDate: this._findKey(dxf.entities, 'creation date'),
+      creationTime: this._findKey(dxf.entities, 'creation time')
+    };
+
+    // console.log(asset);
+    err = foundError ? new Error(this.diagnostics.map(diag => diag.message).join('\n')) : null;
     const ret: IReturnValue = {
       data: {
+        asset,
         baseSize,
         pieces: Array.from(pieceMap.values()),
         sizes: Array.from(sizeSet).sort(),
         vertices: this.vertices
       },
       diagnostics: this.diagnostics
-    }
+    };
 
-    callback(err, ret)
+    callback(err, ret);
   }
 
   private _checkBlock(entities: DXF.BlockEntity[]) {
@@ -133,207 +159,194 @@ class ASTMParser {
         case ASTMLayers.GrainLine:
         case ASTMLayers.Notches:
         case ASTMLayers.GradeReference:
-          break
+          break;
         case ASTMLayers.AnnotationText:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity))
-          break
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity));
+          break;
         case ASTMLayers.ASTMBoundery:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Boundery`, entity))
-          break
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Boundery`, entity));
+          break;
         case ASTMLayers.ASTMInternalLines:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Internal Lines`, entity))
-          break
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Internal Lines`, entity));
+          break;
         case ASTMLayers.MirrorLine:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Mirror Line`, entity))
-          break
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Mirror Line`, entity));
+          break;
         case ASTMLayers.DrillHoles:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Drill Holes`, entity))
-          break
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Drill Holes`, entity));
+          break;
         default:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: `, entity))
+          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: `, entity));
       }
-    })
+    });
   }
 
   private _getVertexIndex(vertex: DXF.Vertex | DXF.Point) {
-    this.count++
-
-    const fx = vertex.x * 25.4
-    const fy = vertex.y * 25.4
+    this.count++;
+    const fx = vertex.x * 25.4;
+    const fy = vertex.y * 25.4;
 
     for (let i = 0; i < this.vertices.length / 2; i++) {
-      const x = this.vertices[i * 2]
-      const y = this.vertices[i * 2 + 1]
+      const x = this.vertices[i * 2];
+      const y = this.vertices[i * 2 + 1];
       if (x === fx && y === fy) {
-        return i
+        return i;
       }
     }
-    this.vertices.push(fx, fy)
-    return this.vertices.length / 2 - 1
+    this.vertices.push(fx, fy);
+    return this.vertices.length / 2 - 1;
   }
 
-  private _findKey(entities: DXF.BlockEntity[], key: string): string | null {
+  private _findKey(entities: DXF.BlockEntity[], key: string): string {
     for (const entity of entities) {
       if (entity.type === 'TEXT') {
-        const result = getTextKeyValue(entity)
+        const result = getTextKeyValue(entity);
         if (!result) {
-          this.diagnostics.push(new Diagnostic(Severity.WARNING, 'Unexpected sytax in key-value text string: ' + entity.text, entity))
-          continue
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, 'Unexpected syntax in key-value text string: ' + entity.text, entity));
+          continue;
         }
+        // console.log(result)
         if (result.key.toLowerCase() === key) {
-          return result.value
+          return result.value;
         }
       }
     }
-    return null
+    return '';
   }
 
   private _createLines(entities: DXF.BlockEntity[], layer: ASTMLayers) {
-    const shape: IShape = {
-      lengths: [],
-      metadata: {},
-      vertices: []
-    }
+    const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
+
     entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
       switch (entity.type) {
         case 'LINE':
           if (entity.vertices.length !== 2) {
-            this.diagnostics.push(new Diagnostic(Severity.WARNING, `Found line with more than 2 vertices: '${entity.vertices.length}'`, entity.vertices))
+            this.diagnostics.push(new Diagnostic(Severity.WARNING, `Found line with more than 2 vertices: '${entity.vertices.length}'`, entity.vertices));
           }
-          shape.lengths.push(2)
-          shape.vertices.push(this._getVertexIndex(entity.vertices[0]))
-          shape.vertices.push(this._getVertexIndex(entity.vertices[1]))
-          break
+          shape.lengths.push(2);
+          shape.vertices.push(this._getVertexIndex(entity.vertices[0]));
+          shape.vertices.push(this._getVertexIndex(entity.vertices[1]));
+          break;
         case 'TEXT':
-          const metadata = shape.metadata
+          const metadata = shape.metadata;
           if (!metadata.astm) {
-            metadata.astm = []
+            metadata.astm = [];
           }
-          metadata.astm.push(entity.text)
-          break
+          metadata.astm.push(entity.text);
+          break;
         default:
-          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity))
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity));
       }
-    })
-    return shape
+    });
+    return shape;
   }
 
   private _createPoints(entities: DXF.BlockEntity[], layer: ASTMLayers) {
-    const shape: IShape = {
-      lengths: [],
-      metadata: {},
-      vertices: []
-    }
+    const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
     entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
       switch (entity.type) {
         case 'POINT':
-          shape.lengths.push(1)
-          shape.vertices.push(this._getVertexIndex(entity.position))
-          break
+          shape.lengths.push(1);
+          shape.vertices.push(this._getVertexIndex(entity.position));
+          break;
         case 'TEXT':
-          const metadata = shape.metadata
+          const metadata = shape.metadata;
           if (!metadata.astm) {
-            metadata.astm = []
+            metadata.astm = [];
           }
-          metadata.astm.push(entity.text)
-          break
+          metadata.astm.push(entity.text);
+          break;
         default:
-          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity))
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
       }
-    })
-    return shape
+    });
+    return shape;
   }
 
   private _createBoundery(entities: DXF.BlockEntity[]) {
-    const shape: IShape = {
-      lengths: [],
-      metadata: {},
-      vertices: []
-    }
+    const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
     entities.filter(entity => entity.layer === ASTMLayers.Boundery.toString()).forEach(entity => {
       switch (entity.type) {
         case 'POLYLINE':
-          shape.lengths.push(entity.vertices.length)
+          shape.lengths.push(entity.vertices.length);
           entity.vertices.forEach(vertex => {
-            shape.vertices.push(this._getVertexIndex(vertex))
-          })
-          break
+            shape.vertices.push(this._getVertexIndex(vertex));
+          });
+          break;
         case 'LINE':
-          shape.lengths.push(entity.vertices.length)
+          shape.lengths.push(entity.vertices.length);
           entity.vertices.forEach(vertex => {
-            shape.vertices.push(this._getVertexIndex(vertex))
-          })
-          break
+            shape.vertices.push(this._getVertexIndex(vertex));
+          });
+          break;
         case 'TEXT':
-          const metadata = shape.metadata
+          const metadata = shape.metadata;
           if (!metadata.astm) {
-            metadata.astm = []
+            metadata.astm = [];
           }
-          metadata.astm.push(entity.text)
-          break
+          metadata.astm.push(entity.text);
+          break;
         default:
-        // this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in boundery shape: '${entity.type}'`, entity))
+        // this.diagnostics.push(new Diagnostic(Severity.WARNING,
+        // `Unexpected entity in boundery shape: '${entity.type}'`,
+        // entity))
       }
-    })
+    });
 
-    return shape
+    return shape;
   }
 
   private _createInternalShapes(entities: DXF.BlockEntity[]) {
-    const shape: IShape = {
-      lengths: [],
-      metadata: {},
-      vertices: []
-    }
+    const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
     entities.filter(entity => entity.layer === ASTMLayers.InternalLines.toString()).forEach(entity => {
       switch (entity.type) {
         case 'POLYLINE':
-          shape.lengths.push(entity.vertices.length)
+          shape.lengths.push(entity.vertices.length);
           entity.vertices.forEach(vertex => {
-            shape.vertices.push(this._getVertexIndex(vertex))
-          })
-          break
+            shape.vertices.push(this._getVertexIndex(vertex));
+          });
+          break;
         case 'LINE':
-          shape.lengths.push(entity.vertices.length)
+          shape.lengths.push(entity.vertices.length);
           entity.vertices.forEach(vertex => {
-            shape.vertices.push(this._getVertexIndex(vertex))
-          })
-          break
+            shape.vertices.push(this._getVertexIndex(vertex));
+          });
+          break;
         case 'TEXT':
-          const metadata = shape.metadata
+          const metadata = shape.metadata;
           if (!metadata.astm) {
-            metadata.astm = []
+            metadata.astm = [];
           }
           // console.log(entity.text)
-          metadata.astm.push(entity.text)
-          break
+          metadata.astm.push(entity.text);
+          break;
         default:
-          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity))
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity));
       }
-    })
+    });
 
-    return shape
+    return shape;
   }
 }
 
 function isText(entity: DXF.BlockEntity): entity is DXF.EntityText {
-  return (entity as DXF.EntityText).type === 'TEXT'
+  return (entity as DXF.EntityText).type === 'TEXT';
 }
 
 function isPolyLine(entity: DXF.BlockEntity): entity is DXF.EntityPolyline {
-  return (entity as DXF.EntityPolyline).type === 'POLYLINE'
+  return (entity as DXF.EntityPolyline).type === 'POLYLINE';
 }
 
 function getTextKeyValue(entity: DXF.EntityText): { key: string; value: string } | null {
-  const text = entity.text
-  const splitPos = text.indexOf(':')
+  const text = entity.text;
+  const splitPos = text.indexOf(':');
   if (splitPos === -1) {
-    return null
+    return null;
   }
   return {
     key: text.substr(0, splitPos),
     value: text.substr(splitPos + 1).trim()
-  }
+  };
 }
 
-export { ASTMParser }
+export { ASTMParser };
