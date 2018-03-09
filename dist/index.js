@@ -62,6 +62,10 @@ class ASTMParser {
         });
         const baseSizeStr = this._findKey(dxf.entities, 'sample size');
         const baseSize = baseSizeStr ? baseSizeStr : 'M';
+        const style = {
+            baseSize,
+            name: this._findKey(dxf.entities, 'style name')
+        };
         const asset = {
             authoringTool: this._findKey(dxf.entities, 'product'),
             authoringToolVersion: this._findKey(dxf.entities, 'version'),
@@ -74,9 +78,9 @@ class ASTMParser {
         const ret = {
             data: {
                 asset,
-                baseSize,
                 pieces: Array.from(pieceMap.values()),
                 sizes: Array.from(sizeSet).sort(),
+                style,
                 vertices: this.vertices
             },
             diagnostics: this.diagnostics

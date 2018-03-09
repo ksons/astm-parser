@@ -8,6 +8,10 @@ export interface IAsset {
     creationDate: string;
     creationTime: string;
 }
+export interface IStyle {
+    name: string;
+    baseSize: string;
+}
 export interface IPatternPiece {
     name: string;
     shapes: object;
@@ -22,8 +26,8 @@ export interface IOpenPatternFormat {
     asset: IAsset;
     pieces: IPatternPiece[];
     sizes: string[];
+    style: IStyle;
     vertices: number[];
-    baseSize: string;
 }
 export interface IReturnValue {
     data: IOpenPatternFormat;

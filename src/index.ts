@@ -38,6 +38,11 @@ export interface IAsset {
   creationTime: string;
 }
 
+export interface IStyle {
+  name: string;
+  baseSize: string;
+}
+
 export interface IPatternPiece {
   name: string;
   shapes: object;
@@ -53,8 +58,8 @@ export interface IOpenPatternFormat {
   asset: IAsset;
   pieces: IPatternPiece[];
   sizes: string[];
+  style: IStyle;
   vertices: number[];
-  baseSize: string;
 }
 
 export interface IReturnValue {
@@ -125,6 +130,11 @@ class ASTMParser {
     const baseSizeStr = this._findKey(dxf.entities, 'sample size');
     const baseSize = baseSizeStr ? baseSizeStr : 'M';
 
+    const style: IStyle = {
+      baseSize,
+      name: this._findKey(dxf.entities, 'style name')
+    };
+
     const asset: IAsset = {
       authoringTool: this._findKey(dxf.entities, 'product'),
       authoringToolVersion: this._findKey(dxf.entities, 'version'),
@@ -138,9 +148,9 @@ class ASTMParser {
     const ret: IReturnValue = {
       data: {
         asset,
-        baseSize,
         pieces: Array.from(pieceMap.values()),
         sizes: Array.from(sizeSet).sort(),
+        style,
         vertices: this.vertices
       },
       diagnostics: this.diagnostics
