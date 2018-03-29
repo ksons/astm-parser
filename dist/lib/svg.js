@@ -6,7 +6,7 @@ const path = require("path");
 const pd = require("pretty-data");
 const __1 = require("..");
 const BBox_1 = require("./BBox");
-const DXF_FILE_PATH = path.join(__dirname, '..', '..', 'test', 'data', 'dxf', 'C-S1615WWO206-10-26.DXF');
+const DXF_FILE_PATH = path.join(__dirname, '..', '..', 'test', 'data', 'dxf', 'GMG1016S19_AAMA.DXF');
 const fileStream = fs.createReadStream(DXF_FILE_PATH, { encoding: 'utf8' });
 function roundToTwo(num) {
     return +(Math.round(num + 'e+2') + 'e-2');
@@ -25,7 +25,7 @@ function generatePointsFromShape(shape, vertices, bbox, size) {
         const vidx = shape.vertices[i];
         const x = vertices[vidx * 2];
         const y = -vertices[vidx * 2 + 1];
-        const circleSVG = `<circle class="size${size}" cx="${roundToTwo(x)}" cy="${roundToTwo(y)}" r="2" fill="red"/>`;
+        const circleSVG = `<circle class="size${size}" cx="${roundToTwo(x)}" cy="${roundToTwo(y)}" r="2" fill="red" vector-effect="non-scaling-stroke" />`;
         circles.push(circleSVG);
         bbox.addToBox(x, y);
         i++;
@@ -92,6 +92,7 @@ parser.parseStream(fileStream, (err, res) => {
         let grainLines = [];
         let notches = [];
         let gradeReferences = [];
+        let mirrorLines = [];
         data.sizes.forEach(size => {
             const isBaseSize = size === baseSize;
             const id = piece.name + '-' + size;
@@ -99,7 +100,7 @@ parser.parseStream(fileStream, (err, res) => {
             if (d) {
                 const color = rainbow(size);
                 const fill = isBaseSize ? '#ddd' : 'none';
-                const sizePath = `<path id="path-${id}" class="size${size}" d="${d}" fill="${fill}" stroke="${color}"/>`;
+                const sizePath = `<path id="path-${id}" class="size${size}" d="${d}" fill="${fill}" stroke="${color}" vector-effect="non-scaling-stroke"/>`;
                 if (isBaseSize) {
                     // prepend the baseSize path as it is filled and should be on the bottom of the size stack
                     bounderies.unshift(sizePath);
@@ -110,7 +111,7 @@ parser.parseStream(fileStream, (err, res) => {
             }
             const di = generateSegmentsFromShape(piece.internalShapes[size], data.vertices, bbox);
             internalShapes = internalShapes.concat(di.map((dStr, idx) => {
-                return `<path id="internal-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="blue"/>`;
+                return `<path id="internal-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="blue" vector-effect="non-scaling-stroke"/>`;
             }));
             const tp = generatePointsFromShape(piece.turnPoints[size], data.vertices, bbox, size);
             turnPoints = turnPoints.concat(tp);
@@ -120,11 +121,15 @@ parser.parseStream(fileStream, (err, res) => {
             notches = notches.concat(no);
             const gl = generateSegmentsFromShape(piece.grainLines[size], data.vertices, bbox);
             grainLines = grainLines.concat(gl.map((dStr, idx) => {
-                return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="black"/>`;
+                return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="black" vector-effect="non-scaling-stroke" />`;
+            }));
+            const ml = generateSegmentsFromShape(piece.mirrorLines[size], data.vertices, bbox);
+            mirrorLines = mirrorLines.concat(ml.map((dStr, idx) => {
+                return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="black" vector-effect="non-scaling-stroke" />`;
             }));
             const grl = generateSegmentsFromShape(piece.gradeReferences[size], data.vertices, bbox);
             gradeReferences = gradeReferences.concat(grl.map((dStr, idx) => {
-                return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="green"/>`;
+                return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="green" vector-effect="non-scaling-stroke" />`;
             }));
         });
         layerStr += `<g id="layer${layerCount++}" inkscape:label="${piece.name}" inkscape:groupmode="layer">`;
@@ -157,6 +162,11 @@ parser.parseStream(fileStream, (err, res) => {
         if (gradeReferences.length) {
             layerStr += `<g id="layer${layerCount++}" inkscape:label="${piece.name} gradeReference" inkscape:groupmode="layer">`;
             layerStr += gradeReferences.join();
+            layerStr += '</g>';
+        }
+        if (mirrorLines.length) {
+            layerStr += `<g id="layer${layerCount++}" inkscape:label="${piece.name} mirrorLines" inkscape:groupmode="layer">`;
+            layerStr += mirrorLines.join();
             layerStr += '</g>';
         }
         layerStr += '</g>';

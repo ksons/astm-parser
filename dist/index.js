@@ -44,6 +44,7 @@ class ASTMParser {
                     gradeReferences: {},
                     grainLines: {},
                     internalShapes: {},
+                    mirrorLines: {},
                     name,
                     notches: {},
                     shapes: {},
@@ -58,6 +59,7 @@ class ASTMParser {
             actualPiece.notches[size] = this._createPoints(block.entities, 4 /* Notches */);
             actualPiece.grainLines[size] = this._createLines(block.entities, 7 /* GrainLine */);
             actualPiece.gradeReferences[size] = this._createLines(block.entities, 5 /* GradeReference */);
+            actualPiece.mirrorLines[size] = this._createLines(block.entities, 6 /* MirrorLine */);
             this._checkBlock(block.entities);
         });
         const baseSizeStr = this._findKey(dxf.entities, 'sample size');
@@ -97,6 +99,7 @@ class ASTMParser {
                 case 7 /* GrainLine */:
                 case 4 /* Notches */:
                 case 5 /* GradeReference */:
+                case 6 /* MirrorLine */:
                     break;
                 case 15 /* AnnotationText */:
                     this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity));
@@ -106,9 +109,6 @@ class ASTMParser {
                     break;
                 case 85 /* ASTMInternalLines */:
                     this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Internal Lines`, entity));
-                    break;
-                case 6 /* MirrorLine */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Mirror Line`, entity));
                     break;
                 case 13 /* DrillHoles */:
                     this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Drill Holes`, entity));

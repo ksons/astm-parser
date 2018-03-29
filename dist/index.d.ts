@@ -21,6 +21,7 @@ export interface IPatternPiece {
     grainLines: object;
     notches: object;
     gradeReferences: object;
+    mirrorLines: object;
 }
 export interface IOpenPatternFormat {
     asset: IAsset;
