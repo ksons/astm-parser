@@ -1,12 +1,17 @@
 /// <reference types="node" />
 import * as fs from 'fs';
 import { Diagnostic } from './lib/Diagnostic';
+export const enum Units {
+  MM = 1,
+  INCH = 2
+}
 export interface IAsset {
   authoringTool: string;
   authoringToolVersion: string;
   authoringVendor: string;
   creationDate: string;
   creationTime: string;
+  unit: Units;
 }
 export interface IStyle {
   name: string;
@@ -44,6 +49,7 @@ declare class ASTMParser {
   private _transform(callback, err, dxf);
   private _checkBlock(entities);
   private _getVertexIndex(vertex);
+  private _findUnit(entities);
   private _findKey(entities, key);
   private _createLines(entities, layer);
   private _createPoints(entities, layer);

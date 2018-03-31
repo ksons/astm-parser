@@ -20,6 +20,11 @@ const enum ASTMLayers {
   ASTMInternalLines = 85
 }
 
+export const enum Units {
+  MM = 1,
+  INCH = 2
+}
+
 interface IVertex {
   x: number;
   y: number;
@@ -37,6 +42,7 @@ export interface IAsset {
   authoringVendor: string;
   creationDate: string;
   creationTime: string;
+  unit: Units;
 }
 
 export interface IStyle {
@@ -150,7 +156,8 @@ class ASTMParser {
       authoringToolVersion: this._findKey(dxf.entities, 'version'),
       authoringVendor: this._findKey(dxf.entities, 'author'),
       creationDate: this._findKey(dxf.entities, 'creation date'),
-      creationTime: this._findKey(dxf.entities, 'creation time')
+      creationTime: this._findKey(dxf.entities, 'creation time'),
+      unit: this._findUnit(dxf.entities)
     };
 
     // console.log(asset);
@@ -209,6 +216,18 @@ class ASTMParser {
     }
     this.vertices.push(fx, fy);
     return this.vertices.length / 2 - 1;
+  }
+
+  private _findUnit(entities: DXF.BlockEntity[]): Units {
+    const unitStr = this._findKey(entities, 'units');
+    if (unitStr === 'METRIC') {
+      return Units.MM;
+    }
+    if (unitStr === 'ENGLISH') {
+      return Units.INCH;
+    }
+    this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected unit: '${unitStr}'`));
+    return Units.INCH;
   }
 
   private _findKey(entities: DXF.BlockEntity[], key: string): string {

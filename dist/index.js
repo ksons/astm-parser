@@ -78,7 +78,8 @@ class ASTMParser {
             authoringToolVersion: this._findKey(dxf.entities, 'version'),
             authoringVendor: this._findKey(dxf.entities, 'author'),
             creationDate: this._findKey(dxf.entities, 'creation date'),
-            creationTime: this._findKey(dxf.entities, 'creation time')
+            creationTime: this._findKey(dxf.entities, 'creation time'),
+            unit: this._findUnit(dxf.entities)
         };
         // console.log(asset);
         err = foundError ? new Error(this.diagnostics.map(diag => diag.message).join('\n')) : null;
@@ -132,6 +133,17 @@ class ASTMParser {
         }
         this.vertices.push(fx, fy);
         return this.vertices.length / 2 - 1;
+    }
+    _findUnit(entities) {
+        const unitStr = this._findKey(entities, 'units');
+        if (unitStr === 'METRIC') {
+            return 1 /* MM */;
+        }
+        if (unitStr === 'ENGLISH') {
+            return 2 /* INCH */;
+        }
+        this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected unit: '${unitStr}'`));
+        return 2 /* INCH */;
     }
     _findKey(entities, key) {
         for (const entity of entities) {

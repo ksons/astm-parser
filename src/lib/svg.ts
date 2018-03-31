@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as pd from 'pretty-data';
 
-import { ASTMParser } from '..';
+import { ASTMParser, Units } from '..';
 import { BBox } from './BBox';
 
 const DXF_FILE_PATH = path.join(__dirname, '..', '..', 'test', 'data', 'dxf', 'GMG1016S19_ASTM.DXF');
@@ -31,7 +31,7 @@ function generateText(text): string[] {
   return [`<text  font-family="Verdana" transform="${transformString}" font-size="${text.textHeight}">${text.text}</text>`];
 }
 
-function generatePointsFromShape(shape, vertices: number[], bbox: BBox, size: number): string[] {
+function generatePointsFromShape(shape, vertices: number[], bbox: BBox, size: number, unit: Units): string[] {
   if (!shape) {
     return [];
   }
@@ -46,7 +46,11 @@ function generatePointsFromShape(shape, vertices: number[], bbox: BBox, size: nu
     const vidx = shape.vertices[i];
     const x = vertices[vidx * 2];
     const y = -vertices[vidx * 2 + 1];
-    const circleSVG = `<circle class="size${size}" cx="${roundToTwo(x)}" cy="${roundToTwo(y)}" r="2" fill="red" vector-effect="non-scaling-stroke" />`;
+    let r = 2;
+    if (unit === Units.INCH) {
+      r = r / 25.4;
+    }
+    const circleSVG = `<circle class="size${size}" cx="${roundToTwo(x)}" cy="${roundToTwo(y)}" r="${r}" fill="red" />`;
     circles.push(circleSVG);
     bbox.addToBox(x, y);
     i++;
@@ -107,8 +111,9 @@ parser.parseStream(fileStream, (err, res) => {
   }
 
   const data = res.data;
-  const baseSize = data.baseSize;
-  const rainbow = d3.scaleSequential(d3.interpolateWarm).domain([data.sizes[0], data.sizes[data.sizes.length - 1]]);
+  const baseSize = +data.style.baseSize;
+  const unit = data.asset.unit;
+  const rainbow = d3.scaleSequential(d3.interpolateWarm).domain([+data.sizes[0], +data.sizes[data.sizes.length - 1]]);
   const bbox = new BBox();
 
   let layerStr = '';
@@ -127,13 +132,14 @@ parser.parseStream(fileStream, (err, res) => {
       drillHoles: { svg: [], name: 'drillHoles' }
     };
 
-    data.sizes.forEach(size => {
+    data.sizes.forEach(key => {
+      const size = +key;
       const isBaseSize = size === baseSize;
       const id = piece.name + '-' + size;
 
       const d = generatePathFromShape(piece.shapes[size], data.vertices, bbox);
       if (d) {
-        const color = rainbow(size);
+        const color = rainbow(+size);
         const fill = isBaseSize ? '#ddd' : 'none';
         const sizePath = `<path id="path-${id}" class="size${size}" d="${d}" fill="${fill}" stroke="${color}" vector-effect="non-scaling-stroke"/>`;
 
@@ -152,16 +158,16 @@ parser.parseStream(fileStream, (err, res) => {
         })
       );
 
-      const tp = generatePointsFromShape(piece.turnPoints[size], data.vertices, bbox, size);
+      const tp = generatePointsFromShape(piece.turnPoints[size], data.vertices, bbox, size, unit);
       layers.turnPoints.svg = layers.turnPoints.svg.concat(tp);
 
-      const dh = generatePointsFromShape(piece.drillHoles[size], data.vertices, bbox, size);
+      const dh = generatePointsFromShape(piece.drillHoles[size], data.vertices, bbox, size, unit);
       layers.drillHoles.svg = layers.drillHoles.svg.concat(dh);
 
-      const cp = generatePointsFromShape(piece.curvePoints[size], data.vertices, bbox, size);
+      const cp = generatePointsFromShape(piece.curvePoints[size], data.vertices, bbox, size, unit);
       layers.curvePoints.svg = layers.curvePoints.svg.concat(cp);
 
-      const no = generatePointsFromShape(piece.notches[size], data.vertices, bbox, size);
+      const no = generatePointsFromShape(piece.notches[size], data.vertices, bbox, size, unit);
       layers.notches.svg = layers.notches.svg.concat(no);
 
       const gl = generateSegmentsFromShape(piece.grainLines[size], data.vertices, bbox);
