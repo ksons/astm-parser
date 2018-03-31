@@ -53,6 +53,7 @@ export interface IPatternPiece {
   notches: object;
   gradeReferences: object;
   mirrorLines: object;
+  drillHoles: object;
 }
 
 export interface IOpenPatternFormat {
@@ -108,6 +109,7 @@ class ASTMParser {
       if (!actualPiece) {
         actualPiece = {
           curvePoints: {},
+          drillHoles: {},
           gradeReferences: {},
           grainLines: {},
           internalShapes: {},
@@ -127,6 +129,7 @@ class ASTMParser {
       actualPiece.grainLines[size] = this._createLines(block.entities, ASTMLayers.GrainLine);
       actualPiece.gradeReferences[size] = this._createLines(block.entities, ASTMLayers.GradeReference);
       actualPiece.mirrorLines[size] = this._createLines(block.entities, ASTMLayers.MirrorLine);
+      actualPiece.drillHoles[size] = this._createPoints(block.entities, ASTMLayers.DrillHoles);
       this._checkBlock(block.entities);
     });
 
@@ -173,6 +176,7 @@ class ASTMParser {
         case ASTMLayers.Notches:
         case ASTMLayers.GradeReference:
         case ASTMLayers.MirrorLine:
+        case ASTMLayers.DrillHoles:
           break;
         case ASTMLayers.AnnotationText:
           this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity));
@@ -182,9 +186,6 @@ class ASTMParser {
           break;
         case ASTMLayers.ASTMInternalLines:
           this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Internal Lines`, entity));
-          break;
-        case ASTMLayers.DrillHoles:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Drill Holes`, entity));
           break;
         default:
           this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: `, entity));
