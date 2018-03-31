@@ -9,7 +9,7 @@ const BBox_1 = require("./BBox");
 const DXF_FILE_PATH = path.join(__dirname, '..', '..', 'test', 'data', 'dxf', 'GMG1016S19_ASTM.DXF');
 const fileStream = fs.createReadStream(DXF_FILE_PATH, { encoding: 'utf8' });
 function roundToTwo(num) {
-    return +(Math.round(num + 'e+2') + 'e-2');
+    return +(Math.round(+(num + 'e+2')) + 'e-2');
 }
 function generateText(text) {
     if (!text) {
@@ -121,7 +121,7 @@ parser.parseStream(fileStream, (err, res) => {
             const size = +key;
             const isBaseSize = size === baseSize;
             const id = piece.name + '-' + size;
-            const d = generatePathFromShape(piece.shapes[size], data.vertices, bbox);
+            const d = generatePathFromShape(piece.shapes[size], piece.vertices, bbox);
             if (d) {
                 const color = rainbow(+size);
                 const fill = isBaseSize ? '#ddd' : 'none';
@@ -134,27 +134,27 @@ parser.parseStream(fileStream, (err, res) => {
                     layers.bounderies.svg.push(sizePath);
                 }
             }
-            const di = generateSegmentsFromShape(piece.internalShapes[size], data.vertices, bbox);
+            const di = generateSegmentsFromShape(piece.internalShapes[size], piece.vertices, bbox);
             layers.internalShapes.svg = layers.internalShapes.svg.concat(di.map((dStr, idx) => {
                 return `<path id="internal-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="blue" vector-effect="non-scaling-stroke"/>`;
             }));
-            const tp = generatePointsFromShape(piece.turnPoints[size], data.vertices, bbox, size, unit);
+            const tp = generatePointsFromShape(piece.turnPoints[size], piece.vertices, bbox, size, unit);
             layers.turnPoints.svg = layers.turnPoints.svg.concat(tp);
-            const dh = generatePointsFromShape(piece.drillHoles[size], data.vertices, bbox, size, unit);
+            const dh = generatePointsFromShape(piece.drillHoles[size], piece.vertices, bbox, size, unit);
             layers.drillHoles.svg = layers.drillHoles.svg.concat(dh);
-            const cp = generatePointsFromShape(piece.curvePoints[size], data.vertices, bbox, size, unit);
+            const cp = generatePointsFromShape(piece.curvePoints[size], piece.vertices, bbox, size, unit);
             layers.curvePoints.svg = layers.curvePoints.svg.concat(cp);
-            const no = generatePointsFromShape(piece.notches[size], data.vertices, bbox, size, unit);
+            const no = generatePointsFromShape(piece.notches[size], piece.vertices, bbox, size, unit);
             layers.notches.svg = layers.notches.svg.concat(no);
-            const gl = generateSegmentsFromShape(piece.grainLines[size], data.vertices, bbox);
+            const gl = generateSegmentsFromShape(piece.grainLines[size], piece.vertices, bbox);
             layers.grainLines.svg = layers.grainLines.svg.concat(gl.map((dStr, idx) => {
                 return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="black" vector-effect="non-scaling-stroke" />`;
             }));
-            const ml = generateSegmentsFromShape(piece.mirrorLines[size], data.vertices, bbox);
+            const ml = generateSegmentsFromShape(piece.mirrorLines[size], piece.vertices, bbox);
             layers.mirrorLines.svg = layers.mirrorLines.svg.concat(ml.map((dStr, idx) => {
                 return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="black" vector-effect="non-scaling-stroke" />`;
             }));
-            const grl = generateSegmentsFromShape(piece.gradeReferences[size], data.vertices, bbox);
+            const grl = generateSegmentsFromShape(piece.gradeReferences[size], piece.vertices, bbox);
             layers.gradeReferences.svg = layers.gradeReferences.svg.concat(grl.map((dStr, idx) => {
                 return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="green" vector-effect="non-scaling-stroke" />`;
             }));

@@ -2,12 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 // @ts-ignore
 const DXFParser = require("dxf-parser");
-const _ = require("lodash");
 const Diagnostic_1 = require("./lib/Diagnostic");
+const PatternPiece_1 = require("./lib/PatternPiece");
 class ASTMParser {
     constructor() {
-        this.vertices = [];
-        this.count = 0;
         this.diagnostics = [];
     }
     parseStream(stream, callback) {
@@ -40,32 +38,11 @@ class ASTMParser {
             }
             let actualPiece = pieceMap.get(name);
             if (!actualPiece) {
-                actualPiece = {
-                    annotations: {},
-                    curvePoints: {},
-                    drillHoles: {},
-                    gradeReferences: {},
-                    grainLines: {},
-                    internalShapes: {},
-                    mirrorLines: {},
-                    name,
-                    notches: {},
-                    shapes: {},
-                    turnPoints: {}
-                };
+                actualPiece = new PatternPiece_1.PatternPiece(name);
                 pieceMap.set(name, actualPiece);
             }
-            actualPiece.shapes[size] = this._createBoundery(block.entities);
-            actualPiece.internalShapes[size] = this._createInternalShapes(block.entities);
-            actualPiece.turnPoints[size] = this._createPoints(block.entities, 2 /* TurnPoints */);
-            actualPiece.curvePoints[size] = this._createPoints(block.entities, 3 /* CurvePoints */);
-            actualPiece.notches[size] = this._createPoints(block.entities, 4 /* Notches */);
-            actualPiece.grainLines[size] = this._createLines(block.entities, 7 /* GrainLine */);
-            actualPiece.gradeReferences[size] = this._createLines(block.entities, 5 /* GradeReference */);
-            actualPiece.mirrorLines[size] = this._createLines(block.entities, 6 /* MirrorLine */);
-            actualPiece.drillHoles[size] = this._createPoints(block.entities, 13 /* DrillHoles */);
-            actualPiece.annotations[size] = this._createText(block.entities, 15 /* AnnotationText */);
-            this._checkBlock(block.entities);
+            const diag = actualPiece.createSize(size, block.entities);
+            Array.prototype.push.apply(this.diagnostics, diag);
         });
         const baseSizeStr = this._findKey(dxf.entities, 'sample size');
         const baseSize = baseSizeStr ? baseSizeStr : 'M';
@@ -88,51 +65,11 @@ class ASTMParser {
                 asset,
                 pieces: Array.from(pieceMap.values()),
                 sizes: Array.from(sizeSet).sort(),
-                style,
-                vertices: this.vertices
+                style
             },
             diagnostics: this.diagnostics
         };
         callback(err, ret);
-    }
-    _checkBlock(entities) {
-        entities.forEach(entity => {
-            switch (+entity.layer) {
-                case 1 /* Boundery */:
-                case 8 /* InternalLines */:
-                case 2 /* TurnPoints */:
-                case 3 /* CurvePoints */:
-                case 7 /* GrainLine */:
-                case 4 /* Notches */:
-                case 5 /* GradeReference */:
-                case 6 /* MirrorLine */:
-                case 13 /* DrillHoles */:
-                case 15 /* AnnotationText */:
-                    break;
-                case 84 /* ASTMBoundery */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Boundery`, entity));
-                    break;
-                case 85 /* ASTMInternalLines */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Internal Lines`, entity));
-                    break;
-                default:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: `, entity));
-            }
-        });
-    }
-    _getVertexIndex(vertex) {
-        this.count++;
-        const fx = vertex.x;
-        const fy = vertex.y;
-        for (let i = 0; i < this.vertices.length / 2; i++) {
-            const x = this.vertices[i * 2];
-            const y = this.vertices[i * 2 + 1];
-            if (x === fx && y === fy) {
-                return i;
-            }
-        }
-        this.vertices.push(fx, fy);
-        return this.vertices.length / 2 - 1;
     }
     _findUnit(entities) {
         const unitStr = this._findKey(entities, 'units');
@@ -160,123 +97,6 @@ class ASTMParser {
             }
         }
         return '';
-    }
-    _createLines(entities, layer) {
-        const shape = { lengths: [], metadata: {}, vertices: [] };
-        entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
-            switch (entity.type) {
-                case 'LINE':
-                    if (entity.vertices.length !== 2) {
-                        this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Found line with more than 2 vertices: '${entity.vertices.length}'`, entity.vertices));
-                    }
-                    shape.lengths.push(2);
-                    shape.vertices.push(this._getVertexIndex(entity.vertices[0]));
-                    shape.vertices.push(this._getVertexIndex(entity.vertices[1]));
-                    break;
-                case 'TEXT':
-                    const metadata = shape.metadata;
-                    if (!metadata.astm) {
-                        metadata.astm = [];
-                    }
-                    metadata.astm.push(entity.text);
-                    break;
-                default:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity));
-            }
-        });
-        return shape;
-    }
-    _createPoints(entities, layer) {
-        const shape = { lengths: [], metadata: {}, vertices: [] };
-        entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
-            switch (entity.type) {
-                case 'POINT':
-                    shape.lengths.push(1);
-                    shape.vertices.push(this._getVertexIndex(entity.position));
-                    break;
-                case 'TEXT':
-                    const metadata = shape.metadata;
-                    if (!metadata.astm) {
-                        metadata.astm = [];
-                    }
-                    metadata.astm.push(entity.text);
-                    break;
-                default:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
-            }
-        });
-        return shape;
-    }
-    _createText(entities, layer) {
-        let text = null;
-        entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
-            switch (entity.type) {
-                case 'TEXT':
-                    text = _.omit(entity, ['type', 'layer', 'handle']);
-                    break;
-                default:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
-            }
-        });
-        return text;
-    }
-    _createBoundery(entities) {
-        const shape = { lengths: [], metadata: {}, vertices: [] };
-        entities.filter(entity => entity.layer === 1 /* Boundery */.toString()).forEach(entity => {
-            switch (entity.type) {
-                case 'POLYLINE':
-                    shape.lengths.push(entity.vertices.length);
-                    entity.vertices.forEach(vertex => {
-                        shape.vertices.push(this._getVertexIndex(vertex));
-                    });
-                    break;
-                case 'LINE':
-                    shape.lengths.push(entity.vertices.length);
-                    entity.vertices.forEach(vertex => {
-                        shape.vertices.push(this._getVertexIndex(vertex));
-                    });
-                    break;
-                case 'TEXT':
-                    const metadata = shape.metadata;
-                    if (!metadata.astm) {
-                        metadata.astm = [];
-                    }
-                    metadata.astm.push(entity.text);
-                    break;
-                default:
-            }
-        });
-        return shape;
-    }
-    _createInternalShapes(entities) {
-        const shape = { lengths: [], metadata: {}, vertices: [] };
-        entities.filter(entity => entity.layer === 8 /* InternalLines */.toString()).forEach(entity => {
-            switch (entity.type) {
-                case 'POLYLINE':
-                    shape.lengths.push(entity.vertices.length);
-                    entity.vertices.forEach(vertex => {
-                        shape.vertices.push(this._getVertexIndex(vertex));
-                    });
-                    break;
-                case 'LINE':
-                    shape.lengths.push(entity.vertices.length);
-                    entity.vertices.forEach(vertex => {
-                        shape.vertices.push(this._getVertexIndex(vertex));
-                    });
-                    break;
-                case 'TEXT':
-                    const metadata = shape.metadata;
-                    if (!metadata.astm) {
-                        metadata.astm = [];
-                    }
-                    // console.log(entity.text)
-                    metadata.astm.push(entity.text);
-                    break;
-                default:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity));
-            }
-        });
-        return shape;
     }
 }
 exports.ASTMParser = ASTMParser;
