@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 // @ts-ignore
 const DXFParser = require("dxf-parser");
+const _ = require("lodash");
 const Diagnostic_1 = require("./lib/Diagnostic");
 class ASTMParser {
     constructor() {
@@ -40,6 +41,7 @@ class ASTMParser {
             let actualPiece = pieceMap.get(name);
             if (!actualPiece) {
                 actualPiece = {
+                    annotations: {},
                     curvePoints: {},
                     drillHoles: {},
                     gradeReferences: {},
@@ -62,6 +64,7 @@ class ASTMParser {
             actualPiece.gradeReferences[size] = this._createLines(block.entities, 5 /* GradeReference */);
             actualPiece.mirrorLines[size] = this._createLines(block.entities, 6 /* MirrorLine */);
             actualPiece.drillHoles[size] = this._createPoints(block.entities, 13 /* DrillHoles */);
+            actualPiece.annotations[size] = this._createText(block.entities, 15 /* AnnotationText */);
             this._checkBlock(block.entities);
         });
         const baseSizeStr = this._findKey(dxf.entities, 'sample size');
@@ -103,9 +106,7 @@ class ASTMParser {
                 case 5 /* GradeReference */:
                 case 6 /* MirrorLine */:
                 case 13 /* DrillHoles */:
-                    break;
                 case 15 /* AnnotationText */:
-                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity));
                     break;
                 case 84 /* ASTMBoundery */:
                     this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Boundery`, entity));
@@ -120,8 +121,8 @@ class ASTMParser {
     }
     _getVertexIndex(vertex) {
         this.count++;
-        const fx = vertex.x * 25.4;
-        const fy = vertex.y * 25.4;
+        const fx = vertex.x;
+        const fy = vertex.y;
         for (let i = 0; i < this.vertices.length / 2; i++) {
             const x = this.vertices[i * 2];
             const y = this.vertices[i * 2 + 1];
@@ -193,6 +194,19 @@ class ASTMParser {
             }
         });
         return shape;
+    }
+    _createText(entities, layer) {
+        let text = null;
+        entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
+            switch (entity.type) {
+                case 'TEXT':
+                    text = _.omit(entity, ['type', 'layer', 'handle']);
+                    break;
+                default:
+                    this.diagnostics.push(new Diagnostic_1.Diagnostic(Diagnostic_1.Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
+            }
+        });
+        return text;
     }
     _createBoundery(entities) {
         const shape = { lengths: [], metadata: {}, vertices: [] };

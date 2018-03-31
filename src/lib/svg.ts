@@ -7,11 +7,28 @@ import * as pd from 'pretty-data';
 import { ASTMParser } from '..';
 import { BBox } from './BBox';
 
-const DXF_FILE_PATH = path.join(__dirname, '..', '..', 'test', 'data', 'dxf', 'SS17_M POLO REG_AAMA.DXF');
+const DXF_FILE_PATH = path.join(__dirname, '..', '..', 'test', 'data', 'dxf', 'GMG1016S19_ASTM.DXF');
 const fileStream = fs.createReadStream(DXF_FILE_PATH, { encoding: 'utf8' });
 
 function roundToTwo(num: number) {
   return +(Math.round(num + 'e+2') + 'e-2');
+}
+
+function generateText(text): string[] {
+  if (!text) {
+    return [];
+  }
+  let transformString = '';
+  if (text.hasOwnProperty('startPoint')) {
+    const x = text.startPoint.x;
+    const y = -text.startPoint.y;
+    transformString = `translate(${x} ${y})`;
+  }
+
+  if (text.hasOwnProperty('rotation')) {
+    transformString += `rotate(${-text.rotation})`;
+  }
+  return [`<text  font-family="Verdana" transform="${transformString}" font-size="${text.textHeight}">${text.text}</text>`];
 }
 
 function generatePointsFromShape(shape, vertices: number[], bbox: BBox, size: number): string[] {
@@ -29,7 +46,7 @@ function generatePointsFromShape(shape, vertices: number[], bbox: BBox, size: nu
     const vidx = shape.vertices[i];
     const x = vertices[vidx * 2];
     const y = -vertices[vidx * 2 + 1];
-    const circleSVG = `<circle class="size${size}" cx="${roundToTwo(x)}" cy="${roundToTwo(y)}" r="10" fill="red" vector-effect="non-scaling-stroke" />`;
+    const circleSVG = `<circle class="size${size}" cx="${roundToTwo(x)}" cy="${roundToTwo(y)}" r="2" fill="red" vector-effect="non-scaling-stroke" />`;
     circles.push(circleSVG);
     bbox.addToBox(x, y);
     i++;
@@ -98,6 +115,7 @@ parser.parseStream(fileStream, (err, res) => {
   let layerCount = 0;
   data.pieces.forEach(piece => {
     const layers = {
+      annotations: { svg: [], name: 'annotations' },
       bounderies: { svg: [], name: 'bounderies' },
       internalShapes: { svg: [], name: 'internal' },
       turnPoints: { svg: [], name: 'turn points' },
@@ -166,6 +184,9 @@ parser.parseStream(fileStream, (err, res) => {
           return `<path id="grainline-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="green" vector-effect="non-scaling-stroke" />`;
         })
       );
+
+      const annotation = generateText(piece.annotations[size]);
+      layers.annotations.svg = layers.annotations.svg.concat(annotation);
     });
 
     layerStr += `<g id="layer${layerCount++}" inkscape:label="${piece.name}" inkscape:groupmode="layer">`;

@@ -1,6 +1,7 @@
 // @ts-ignore
 import * as DXFParser from 'dxf-parser';
 import * as fs from 'fs';
+import * as _ from 'lodash';
 import * as DXF from './dxf';
 import { Diagnostic, Severity } from './lib/Diagnostic';
 
@@ -54,6 +55,7 @@ export interface IPatternPiece {
   gradeReferences: object;
   mirrorLines: object;
   drillHoles: object;
+  annotations: object;
 }
 
 export interface IOpenPatternFormat {
@@ -108,6 +110,7 @@ class ASTMParser {
       let actualPiece = pieceMap.get(name);
       if (!actualPiece) {
         actualPiece = {
+          annotations: {},
           curvePoints: {},
           drillHoles: {},
           gradeReferences: {},
@@ -130,6 +133,7 @@ class ASTMParser {
       actualPiece.gradeReferences[size] = this._createLines(block.entities, ASTMLayers.GradeReference);
       actualPiece.mirrorLines[size] = this._createLines(block.entities, ASTMLayers.MirrorLine);
       actualPiece.drillHoles[size] = this._createPoints(block.entities, ASTMLayers.DrillHoles);
+      actualPiece.annotations[size] = this._createText(block.entities, ASTMLayers.AnnotationText);
       this._checkBlock(block.entities);
     });
 
@@ -177,9 +181,7 @@ class ASTMParser {
         case ASTMLayers.GradeReference:
         case ASTMLayers.MirrorLine:
         case ASTMLayers.DrillHoles:
-          break;
         case ASTMLayers.AnnotationText:
-          this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: Annotation Text`, entity));
           break;
         case ASTMLayers.ASTMBoundery:
           this.diagnostics.push(new Diagnostic(Severity.INFO, `Unhandled definition on layer ${entity.layer}: ASTM Boundery`, entity));
@@ -195,8 +197,8 @@ class ASTMParser {
 
   private _getVertexIndex(vertex: DXF.Vertex | DXF.Point) {
     this.count++;
-    const fx = vertex.x * 25.4;
-    const fy = vertex.y * 25.4;
+    const fx = vertex.x;
+    const fy = vertex.y;
 
     for (let i = 0; i < this.vertices.length / 2; i++) {
       const x = this.vertices[i * 2];
@@ -273,6 +275,20 @@ class ASTMParser {
       }
     });
     return shape;
+  }
+
+  private _createText(entities: DXF.BlockEntity[], layer: ASTMLayers) {
+    let text = null;
+    entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
+      switch (entity.type) {
+        case 'TEXT':
+          text = _.omit(entity, ['type', 'layer', 'handle']);
+          break;
+        default:
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
+      }
+    });
+    return text;
   }
 
   private _createBoundery(entities: DXF.BlockEntity[]) {

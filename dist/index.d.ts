@@ -23,6 +23,7 @@ export interface IPatternPiece {
   gradeReferences: object;
   mirrorLines: object;
   drillHoles: object;
+  annotations: object;
 }
 export interface IOpenPatternFormat {
   asset: IAsset;
@@ -46,6 +47,7 @@ declare class ASTMParser {
   private _findKey(entities, key);
   private _createLines(entities, layer);
   private _createPoints(entities, layer);
+  private _createText(entities, layer);
   private _createBoundery(entities);
   private _createInternalShapes(entities);
 }
