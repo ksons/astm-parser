@@ -21,9 +21,7 @@ export async function parse(args: string[], options: ParseOptions): Promise<void
   const parser = new ASTMParser();
   const result = await parser.parseStream(fileStream);
 
-  const jsonOutput = options.pretty !== false
-    ? JSON.stringify(result.data, null, 2)
-    : JSON.stringify(result.data);
+  const jsonOutput = options.pretty !== false ? JSON.stringify(result.data, null, 2) : JSON.stringify(result.data);
 
   if (options.output) {
     fs.writeFileSync(options.output, jsonOutput, 'utf8');
@@ -34,7 +32,7 @@ export async function parse(args: string[], options: ParseOptions): Promise<void
 
   if (result.diagnostics.length > 0) {
     console.error(`\nDiagnostics (${result.diagnostics.length}):`);
-    result.diagnostics.forEach(d => {
+    result.diagnostics.forEach((d) => {
       console.error(`  - ${d.message}`);
     });
   }

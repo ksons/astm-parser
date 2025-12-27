@@ -5,6 +5,8 @@ import { generateSVG } from '@open-patterns/opf2svg';
 interface SVGOptions {
   output?: string;
   pretty?: boolean;
+  size?: string;
+  base?: boolean;
 }
 
 export async function svg(args: string[], options: SVGOptions): Promise<void> {
@@ -22,8 +24,17 @@ export async function svg(args: string[], options: SVGOptions): Promise<void> {
   const parser = new ASTMParser();
   const result = await parser.parseStream(fileStream);
 
+  const size = options.base ? result.data.style.baseSize : options.size;
+  if (size && !result.data.sizes.includes(size)) {
+    throw new Error(`Size "${size}" not found. Available sizes: ${result.data.sizes.join(', ')}`);
+  }
+  if (options.base) {
+    console.error(`Using base size: ${size}`);
+  }
+
   const svgOutput = generateSVG(result.data, {
     prettyPrint: options.pretty !== false,
+    sizes: size ? [size] : [],
   });
 
   if (options.output) {
@@ -35,7 +46,7 @@ export async function svg(args: string[], options: SVGOptions): Promise<void> {
 
   if (result.diagnostics.length > 0) {
     console.error(`\nDiagnostics (${result.diagnostics.length}):`);
-    result.diagnostics.forEach(d => {
+    result.diagnostics.forEach((d) => {
       console.error(`  - ${d.message}`);
     });
   }

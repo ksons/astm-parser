@@ -20,6 +20,7 @@
   "license": "ISC",
   "dependencies": {
     "@open-patterns/astm-parser": "*",
-    "@open-patterns/opf2svg": "*"
+    "@open-patterns/opf2svg": "*",
+    "sharp": "^0.33.5"
   }
 }
