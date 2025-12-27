@@ -1,7 +1,31 @@
 import * as _ from 'lodash';
-import * as DXF from '../dxf.js';
+import type {
+  IEntity,
+  IPoint,
+  ITextEntity,
+  IPointEntity,
+  IPolylineEntity,
+  ILineEntity,
+} from 'dxf-parser';
 import { Diagnostic, Severity } from './Diagnostic.js';
 import { ASTMLayers, IPatternPiece } from './interfaces.js';
+
+// BlockEntity union - IEntity is the base type for unknown entities
+export type BlockEntity = ITextEntity | IPointEntity | IPolylineEntity | ILineEntity | IEntity;
+
+// Type guards for entity narrowing
+function isPolylineEntity(entity: BlockEntity): entity is IPolylineEntity {
+  return entity.type === 'POLYLINE';
+}
+function isLineEntity(entity: BlockEntity): entity is ILineEntity {
+  return entity.type === 'LINE';
+}
+function isTextEntity(entity: BlockEntity): entity is ITextEntity {
+  return entity.type === 'TEXT';
+}
+function isPointEntity(entity: BlockEntity): entity is IPointEntity {
+  return entity.type === 'POINT';
+}
 
 interface IShape {
   lengths: number[];
@@ -27,7 +51,7 @@ export class PatternPiece implements IPatternPiece {
     this.name = name;
   }
 
-  createSize(size: string, entities: DXF.BlockEntity[]): Diagnostic[] {
+  createSize(size: string, entities: BlockEntity[]): Diagnostic[] {
     const diagnostics: Diagnostic[] = [];
 
     this.shapes[size] = this._createBoundery(entities, diagnostics);
@@ -45,7 +69,7 @@ export class PatternPiece implements IPatternPiece {
     return diagnostics;
   }
 
-  private _getVertexIndex(vertex: DXF.Vertex | DXF.Point) {
+  private _getVertexIndex(vertex: IPoint) {
     const fx = vertex.x;
     const fy = vertex.y;
 
@@ -60,7 +84,7 @@ export class PatternPiece implements IPatternPiece {
     return this.vertices.length / 2 - 1;
   }
 
-  private _checkBlock(entities: DXF.BlockEntity[], diagnostics: Diagnostic[]) {
+  private _checkBlock(entities: BlockEntity[], diagnostics: Diagnostic[]) {
     entities.forEach(entity => {
       switch (+entity.layer) {
         case ASTMLayers.Boundery:
@@ -86,129 +110,108 @@ export class PatternPiece implements IPatternPiece {
     });
   }
 
-  private _createBoundery(entities: DXF.BlockEntity[], _diagnostics: Diagnostic[]): IShape {
+  private _createBoundery(entities: BlockEntity[], _diagnostics: Diagnostic[]): IShape {
     const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
     entities.filter(entity => entity.layer === ASTMLayers.Boundery.toString()).forEach(entity => {
-      switch (entity.type) {
-        case 'POLYLINE':
-          shape.lengths.push(entity.vertices.length);
-          entity.vertices.forEach(vertex => {
-            shape.vertices.push(this._getVertexIndex(vertex));
-          });
-          break;
-        case 'LINE':
-          shape.lengths.push(entity.vertices.length);
-          entity.vertices.forEach(vertex => {
-            shape.vertices.push(this._getVertexIndex(vertex));
-          });
-          break;
-        case 'TEXT':
-          const metadata = shape.metadata;
-          if (!metadata.astm) {
-            metadata.astm = [];
-          }
-          metadata.astm.push(entity.text);
-          break;
-        default:
-        // this.diagnostics.push(new Diagnostic(Severity.WARNING,
-        // `Unexpected entity in boundery shape: '${entity.type}'`,
-        // entity))
+      if (isPolylineEntity(entity)) {
+        shape.lengths.push(entity.vertices.length);
+        entity.vertices.forEach(vertex => {
+          shape.vertices.push(this._getVertexIndex(vertex));
+        });
+      } else if (isLineEntity(entity)) {
+        shape.lengths.push(entity.vertices.length);
+        entity.vertices.forEach(vertex => {
+          shape.vertices.push(this._getVertexIndex(vertex));
+        });
+      } else if (isTextEntity(entity)) {
+        const metadata = shape.metadata;
+        if (!metadata.astm) {
+          metadata.astm = [];
+        }
+        metadata.astm.push(entity.text);
       }
     });
 
     return shape;
   }
 
-  private _createLines(entities: DXF.BlockEntity[], layer: ASTMLayers, diagnostics: Diagnostic[]): IShape {
+  private _createLines(entities: BlockEntity[], layer: ASTMLayers, diagnostics: Diagnostic[]): IShape {
     const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
 
     entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
-      switch (entity.type) {
-        case 'LINE':
-          if (entity.vertices.length !== 2) {
-            diagnostics.push(new Diagnostic(Severity.WARNING, `Found line with more than 2 vertices: '${entity.vertices.length}'`, entity.vertices));
-          }
-          shape.lengths.push(2);
-          shape.vertices.push(this._getVertexIndex(entity.vertices[0]));
-          shape.vertices.push(this._getVertexIndex(entity.vertices[1]));
-          break;
-        case 'TEXT':
-          const metadata = shape.metadata;
-          if (!metadata.astm) {
-            metadata.astm = [];
-          }
-          metadata.astm.push(entity.text);
-          break;
-        default:
-          diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity));
+      if (isLineEntity(entity)) {
+        if (entity.vertices.length !== 2) {
+          diagnostics.push(new Diagnostic(Severity.WARNING, `Found line with more than 2 vertices: '${entity.vertices.length}'`, entity.vertices));
+        }
+        shape.lengths.push(2);
+        shape.vertices.push(this._getVertexIndex(entity.vertices[0]));
+        shape.vertices.push(this._getVertexIndex(entity.vertices[1]));
+      } else if (isTextEntity(entity)) {
+        const metadata = shape.metadata;
+        if (!metadata.astm) {
+          metadata.astm = [];
+        }
+        metadata.astm.push(entity.text);
+      } else {
+        diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity));
       }
     });
     return shape;
   }
 
-  private _createPoints(entities: DXF.BlockEntity[], layer: ASTMLayers, diagnostics: Diagnostic[]): IShape {
+  private _createPoints(entities: BlockEntity[], layer: ASTMLayers, diagnostics: Diagnostic[]): IShape {
     const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
     entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
-      switch (entity.type) {
-        case 'POINT':
-          shape.lengths.push(1);
-          shape.vertices.push(this._getVertexIndex(entity.position));
-          break;
-        case 'TEXT':
-          const metadata = shape.metadata;
-          if (!metadata.astm) {
-            metadata.astm = [];
-          }
-          metadata.astm.push(entity.text);
-          break;
-        default:
-          diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
+      if (isPointEntity(entity)) {
+        shape.lengths.push(1);
+        shape.vertices.push(this._getVertexIndex(entity.position));
+      } else if (isTextEntity(entity)) {
+        const metadata = shape.metadata;
+        if (!metadata.astm) {
+          metadata.astm = [];
+        }
+        metadata.astm.push(entity.text);
+      } else {
+        diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
       }
     });
     return shape;
   }
 
-  private _createInternalShapes(entities: DXF.BlockEntity[], diagnostics: Diagnostic[]): IShape {
+  private _createInternalShapes(entities: BlockEntity[], diagnostics: Diagnostic[]): IShape {
     const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
     entities.filter(entity => entity.layer === ASTMLayers.InternalLines.toString()).forEach(entity => {
-      switch (entity.type) {
-        case 'POLYLINE':
-          shape.lengths.push(entity.vertices.length);
-          entity.vertices.forEach(vertex => {
-            shape.vertices.push(this._getVertexIndex(vertex));
-          });
-          break;
-        case 'LINE':
-          shape.lengths.push(entity.vertices.length);
-          entity.vertices.forEach(vertex => {
-            shape.vertices.push(this._getVertexIndex(vertex));
-          });
-          break;
-        case 'TEXT':
-          const metadata = shape.metadata;
-          if (!metadata.astm) {
-            metadata.astm = [];
-          }
-          // console.log(entity.text)
-          metadata.astm.push(entity.text);
-          break;
-        default:
-          diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity));
+      if (isPolylineEntity(entity)) {
+        shape.lengths.push(entity.vertices.length);
+        entity.vertices.forEach(vertex => {
+          shape.vertices.push(this._getVertexIndex(vertex));
+        });
+      } else if (isLineEntity(entity)) {
+        shape.lengths.push(entity.vertices.length);
+        entity.vertices.forEach(vertex => {
+          shape.vertices.push(this._getVertexIndex(vertex));
+        });
+      } else if (isTextEntity(entity)) {
+        const metadata = shape.metadata;
+        if (!metadata.astm) {
+          metadata.astm = [];
+        }
+        metadata.astm.push(entity.text);
+      } else {
+        diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity));
       }
     });
 
     return shape;
   }
 
-  private _createText(entities: DXF.BlockEntity[], layer: ASTMLayers, diagnostics: Diagnostic[]): object {
+  private _createText(entities: BlockEntity[], layer: ASTMLayers, diagnostics: Diagnostic[]): object {
     let text = null;
     entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
-      switch (entity.type) {
-        case 'TEXT':
-          text = _.omit(entity, ['type', 'layer', 'handle']);
-          break;
-        default:
-          diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
+      if (isTextEntity(entity)) {
+        text = _.omit(entity, ['type', 'layer', 'handle']);
+      } else {
+        diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
       }
     });
     return text;

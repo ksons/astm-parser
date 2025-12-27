@@ -2,7 +2,7 @@ import DXFParser, { IEntity, ITextEntity } from 'dxf-parser';
 import * as fs from 'fs';
 import { Diagnostic, Severity } from './lib/Diagnostic.js';
 import { IPatternPiece } from './lib/interfaces.js';
-import { PatternPiece } from './lib/PatternPiece.js';
+import { BlockEntity, PatternPiece } from './lib/PatternPiece.js';
 
 export const enum Units {
   MM = 1,
@@ -65,7 +65,7 @@ class ASTMParser {
         actualPiece = new PatternPiece(name);
         pieceMap.set(name, actualPiece);
       }
-      const diag = actualPiece.createSize(size, block.entities as any);
+      const diag = actualPiece.createSize(size, block.entities as BlockEntity[]);
       Array.prototype.push.apply(this.diagnostics, diag);
     });
 
