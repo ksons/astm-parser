@@ -1,7 +1,5 @@
-// @ts-ignore
-import * as DXFParser from 'dxf-parser';
+import DXFParser, { IDxf, IEntity, ITextEntity } from 'dxf-parser';
 import * as fs from 'fs';
-import * as DXF from './dxf';
 import { Diagnostic, Severity } from './lib/Diagnostic';
 import { ASTMLayers, IPatternPiece } from './lib/interfaces';
 import { PatternPiece } from './lib/PatternPiece';
@@ -46,21 +44,23 @@ class ASTMParser {
   diagnostics: Diagnostic[] = [];
 
   parseStream(stream: fs.ReadStream, callback: (err: Error, msg: IReturnValue) => void) {
-    try {
-      const parser = new DXFParser();
-      parser.parseStream(stream, this._transform.bind(this, callback));
-    } catch (e) {
-      console.log(e);
-    }
+    const parser = new DXFParser();
+    parser.parseStream(stream)
+      .then((dxf: IDxf) => {
+        this._transform(callback, null, dxf);
+      })
+      .catch((e: Error) => {
+        callback(e, null);
+      });
   }
 
-  private _transform(callback: (err: Error, msg?: IReturnValue) => void, err: Error, dxf: DXF.DxfSchema) {
+  private _transform(callback: (err: Error, msg?: IReturnValue) => void, err: Error, dxf: IDxf) {
     if (err) {
       callback(err);
     }
 
     const pieceMap = new Map<string, PatternPiece>();
-    const sizeSet = new Set();
+    const sizeSet = new Set<string>();
     let foundError = false;
 
     Object.keys(dxf.blocks).forEach(key => {
@@ -81,7 +81,7 @@ class ASTMParser {
         actualPiece = new PatternPiece(name);
         pieceMap.set(name, actualPiece);
       }
-      const diag = actualPiece.createSize(size, block.entities);
+      const diag = actualPiece.createSize(size, block.entities as any);
       Array.prototype.push.apply(this.diagnostics, diag);
     });
 
@@ -117,7 +117,7 @@ class ASTMParser {
     callback(err, ret);
   }
 
-  private _findUnit(entities: DXF.BlockEntity[]): Units {
+  private _findUnit(entities: IEntity[]): Units {
     const unitStr = this._findKey(entities, 'units');
     if (unitStr === 'METRIC') {
       return Units.MM;
@@ -129,12 +129,13 @@ class ASTMParser {
     return Units.INCH;
   }
 
-  private _findKey(entities: DXF.BlockEntity[], key: string): string {
+  private _findKey(entities: IEntity[], key: string): string {
     for (const entity of entities) {
       if (entity.type === 'TEXT') {
-        const result = getTextKeyValue(entity);
+        const textEntity = entity as ITextEntity;
+        const result = getTextKeyValue(textEntity);
         if (!result) {
-          this.diagnostics.push(new Diagnostic(Severity.WARNING, 'Unexpected syntax in key-value text string: ' + entity.text, entity));
+          this.diagnostics.push(new Diagnostic(Severity.WARNING, 'Unexpected syntax in key-value text string: ' + textEntity.text, entity));
           continue;
         }
         // console.log(result)
@@ -147,23 +148,19 @@ class ASTMParser {
   }
 }
 
-function isText(entity: DXF.BlockEntity): entity is DXF.EntityText {
-  return (entity as DXF.EntityText).type === 'TEXT';
+function isText(entity: IEntity): entity is ITextEntity {
+  return entity.type === 'TEXT';
 }
 
-function isPolyLine(entity: DXF.BlockEntity): entity is DXF.EntityPolyline {
-  return (entity as DXF.EntityPolyline).type === 'POLYLINE';
-}
-
-function getTextKeyValue(entity: DXF.EntityText): { key: string; value: string } | null {
+function getTextKeyValue(entity: ITextEntity): { key: string; value: string } | null {
   const text = entity.text;
   const splitPos = text.indexOf(':');
   if (splitPos === -1) {
     return null;
   }
   return {
-    key: text.substr(0, splitPos),
-    value: text.substr(splitPos + 1).trim()
+    key: text.substring(0, splitPos),
+    value: text.substring(splitPos + 1).trim()
   };
 }
 

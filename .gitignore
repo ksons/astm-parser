@@ -3,3 +3,7 @@ test
 mocha.opts
 
 dist
+
+# CLAUDE related items
+CLAUDE.md
+.claude/
