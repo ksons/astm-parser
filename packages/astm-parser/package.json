@@ -1,0 +1,34 @@
+{
+  "name": "@open-patterns/astm-parser",
+  "version": "1.0.0",
+  "description": "Parser for ASTM/AAMA DXF pattern files",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "ASTM",
+    "AAMA",
+    "DXF",
+    "Apparel",
+    "Pattern"
+  ],
+  "author": "Kristian Sons",
+  "license": "ISC",
+  "dependencies": {
+    "dxf-parser": "^1.1.2",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.21"
+  }
+}

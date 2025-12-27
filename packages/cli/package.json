@@ -1,0 +1,25 @@
+{
+  "name": "@open-patterns/cli",
+  "version": "1.0.0",
+  "description": "CLI tools for Open Pattern Format",
+  "type": "module",
+  "bin": {
+    "opf": "dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "CLI",
+    "Pattern",
+    "ASTM",
+    "SVG"
+  ],
+  "author": "Kristian Sons",
+  "license": "ISC",
+  "dependencies": {
+    "@open-patterns/astm-parser": "*",
+    "@open-patterns/opf2svg": "*"
+  }
+}

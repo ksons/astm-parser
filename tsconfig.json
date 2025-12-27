@@ -1,24 +1,14 @@
 {
-    "compilerOptions": {
-        "module": "nodenext",
-        "target": "es2022",
-        "noImplicitAny": true,
-        "strictNullChecks": true,
-        "declaration": true,
-        "moduleResolution": "nodenext",
-        "sourceMap": true,
-        "outDir": "dist",
-        "baseUrl": ".",
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "paths": {
-            "*": [
-                "node_modules/*",
-                "src/types/*"
-            ]
-        }
-    },
-    "include": [
-        "./src"
-    ]
+  "compilerOptions": {
+    "module": "nodenext",
+    "target": "es2022",
+    "moduleResolution": "nodenext",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
 }

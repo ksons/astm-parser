@@ -1,48 +1,31 @@
 {
-  "name": "astm-parser",
-  "version": "1.0.0",
-  "description": "Parser for ASTM format",
-  "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "name": "open-patterns",
+  "private": true,
+  "description": "Open Pattern Format tools monorepo",
+  "workspaces": ["packages/*"],
   "scripts": {
+    "build": "npm run build --workspaces",
     "test": "vitest run",
     "test:watch": "vitest",
-    "parse:all": "tsx test/parse-all.ts",
-    "lint": "eslint src test",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+    "lint": "eslint packages/*/src packages/*/test",
+    "format": "prettier --write \"packages/*/src/**/*.ts\" \"packages/*/test/**/*.ts\""
   },
   "keywords": [
     "ASTM",
     "AAMA",
     "DXF",
-    "Apparel"
+    "Apparel",
+    "Pattern"
   ],
   "author": "Kristian Sons",
   "license": "ISC",
-  "dependencies": {
-    "@types/d3": "^7.4.3",
-    "@types/lodash": "^4.17.21",
-    "d3": "^7.9.0",
-    "d3-scale-chromatic": "^3.1.0",
-    "dxf-parser": "^1.1.2",
-    "glob": "^13.0.0",
-    "lodash": "^4.17.21",
-    "pretty-data": "^0.40.0"
-  },
   "devDependencies": {
     "@types/node": "^25.0.3",
     "@typescript-eslint/eslint-plugin": "^8.50.1",
     "@typescript-eslint/parser": "^8.50.1",
-    "ajv": "^8.17.1",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
-    "foreach-in-dir": "^1.2.1",
-    "json-schema-to-typescript": "^15.0.4",
     "prettier": "^3.7.4",
-    "rename-extension": "^4.0.0",
-    "safename": "^2.0.0",
-    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.1",

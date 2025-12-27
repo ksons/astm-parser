@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     testTimeout: 10000,
-    include: ['test/**/*.ts'],
-    exclude: ['test/parse-all.ts'],
+    include: ['packages/*/test/**/*.ts'],
+    exclude: ['**/parse-all.ts'],
   },
 });
