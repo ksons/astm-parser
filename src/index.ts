@@ -1,4 +1,4 @@
-import DXFParser, { IEntity, ITextEntity } from 'dxf-parser';
+import DxfParser, { IEntity, ITextEntity } from 'dxf-parser';
 import * as fs from 'fs';
 import { Diagnostic, Severity } from './lib/Diagnostic.js';
 import { IPatternPiece } from './lib/interfaces.js';
@@ -40,7 +40,8 @@ class ASTMParser {
   diagnostics: Diagnostic[] = [];
 
   async parseStream(stream: fs.ReadStream): Promise<IReturnValue> {
-    const parser = new DXFParser();
+    // @ts-expect-error - ESM/CJS interop issue with dxf-parser default export
+    const parser = new DxfParser();
     const dxf = await parser.parseStream(stream);
 
     const pieceMap = new Map<string, PatternPiece>();

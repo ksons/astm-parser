@@ -28,25 +28,29 @@ function isPointEntity(entity: BlockEntity): entity is IPointEntity {
   return entity.type === 'POINT';
 }
 
-interface IShape {
+export interface IShapeMetadata {
+  astm?: string[];
+}
+
+export interface IShape {
   lengths: number[];
   vertices: number[];
-  metadata?: any;
+  metadata?: IShapeMetadata;
 }
 
 export class PatternPiece implements IPatternPiece {
-  annotations = {};
-  curvePoints = {};
-  drillHoles = {};
-  gradeReferences = {};
-  grainLines = {};
-  internalShapes = {};
-  mirrorLines = {};
+  annotations: Record<string, object | null> = {};
+  curvePoints: Record<string, IShape> = {};
+  drillHoles: Record<string, IShape> = {};
+  gradeReferences: Record<string, IShape> = {};
+  grainLines: Record<string, IShape> = {};
+  internalShapes: Record<string, IShape> = {};
+  mirrorLines: Record<string, IShape> = {};
   name: string;
-  notches = {};
-  shapes = {};
-  turnPoints = {};
-  vertices = [];
+  notches: Record<string, IShape> = {};
+  shapes: Record<string, IShape> = {};
+  turnPoints: Record<string, IShape> = {};
+  vertices: number[] = [];
 
   constructor(name: string) {
     this.name = name;
@@ -125,11 +129,13 @@ export class PatternPiece implements IPatternPiece {
           shape.vertices.push(this._getVertexIndex(vertex));
         });
       } else if (isTextEntity(entity)) {
-        const metadata = shape.metadata;
-        if (!metadata.astm) {
-          metadata.astm = [];
+        if (!shape.metadata) {
+          shape.metadata = {};
         }
-        metadata.astm.push(entity.text);
+        if (!shape.metadata.astm) {
+          shape.metadata.astm = [];
+        }
+        shape.metadata.astm.push(entity.text);
       }
     });
 
@@ -148,11 +154,13 @@ export class PatternPiece implements IPatternPiece {
         shape.vertices.push(this._getVertexIndex(entity.vertices[0]));
         shape.vertices.push(this._getVertexIndex(entity.vertices[1]));
       } else if (isTextEntity(entity)) {
-        const metadata = shape.metadata;
-        if (!metadata.astm) {
-          metadata.astm = [];
+        if (!shape.metadata) {
+          shape.metadata = {};
         }
-        metadata.astm.push(entity.text);
+        if (!shape.metadata.astm) {
+          shape.metadata.astm = [];
+        }
+        shape.metadata.astm.push(entity.text);
       } else {
         diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity));
       }
@@ -167,11 +175,13 @@ export class PatternPiece implements IPatternPiece {
         shape.lengths.push(1);
         shape.vertices.push(this._getVertexIndex(entity.position));
       } else if (isTextEntity(entity)) {
-        const metadata = shape.metadata;
-        if (!metadata.astm) {
-          metadata.astm = [];
+        if (!shape.metadata) {
+          shape.metadata = {};
         }
-        metadata.astm.push(entity.text);
+        if (!shape.metadata.astm) {
+          shape.metadata.astm = [];
+        }
+        shape.metadata.astm.push(entity.text);
       } else {
         diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
       }
@@ -193,11 +203,13 @@ export class PatternPiece implements IPatternPiece {
           shape.vertices.push(this._getVertexIndex(vertex));
         });
       } else if (isTextEntity(entity)) {
-        const metadata = shape.metadata;
-        if (!metadata.astm) {
-          metadata.astm = [];
+        if (!shape.metadata) {
+          shape.metadata = {};
         }
-        metadata.astm.push(entity.text);
+        if (!shape.metadata.astm) {
+          shape.metadata.astm = [];
+        }
+        shape.metadata.astm.push(entity.text);
       } else {
         diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity));
       }
@@ -206,7 +218,7 @@ export class PatternPiece implements IPatternPiece {
     return shape;
   }
 
-  private _createText(entities: BlockEntity[], layer: ASTMLayers, diagnostics: Diagnostic[]): object {
+  private _createText(entities: BlockEntity[], layer: ASTMLayers, diagnostics: Diagnostic[]): object | null {
     let text = null;
     entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
       if (isTextEntity(entity)) {

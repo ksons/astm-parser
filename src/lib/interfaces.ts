@@ -1,3 +1,5 @@
+import type { IShape } from './PatternPiece.js';
+
 export const enum ASTMLayers {
   Boundery = 1,
   TurnPoints = 2,
@@ -15,15 +17,15 @@ export const enum ASTMLayers {
 
 export interface IPatternPiece {
   name: string;
-  shapes: object;
-  internalShapes: object;
-  turnPoints: object;
-  curvePoints: object;
-  grainLines: object;
-  notches: object;
-  gradeReferences: object;
-  mirrorLines: object;
-  drillHoles: object;
-  annotations: object;
+  shapes: Record<string, IShape>;
+  internalShapes: Record<string, IShape>;
+  turnPoints: Record<string, IShape>;
+  curvePoints: Record<string, IShape>;
+  grainLines: Record<string, IShape>;
+  notches: Record<string, IShape>;
+  gradeReferences: Record<string, IShape>;
+  mirrorLines: Record<string, IShape>;
+  drillHoles: Record<string, IShape>;
+  annotations: Record<string, object | null>;
   vertices: number[];
 }

@@ -37,6 +37,8 @@ astm-parser/
 │   ├── mirror.ts             # Mirror line tests
 │   ├── annotation-text.ts    # Annotation tests
 │   ├── drill-holes.ts        # Drill hole tests
+│   ├── point.ts              # Point class tests
+│   ├── bbox.ts               # BBox class tests
 │   ├── parse-all.ts          # Batch parsing script
 │   └── data/dxf/             # Sample DXF files
 ├── schema/                   # JSON Schema definitions
@@ -130,41 +132,14 @@ console.log(result.diagnostics);      // Warnings and errors
 - ~~Callback-based API~~ - Modernized to async/await
 - ~~Duplicate type definitions in `src/dxf.d.ts`~~ - Now uses dxf-parser types
 - ~~Mocha/Chai testing~~ - Migrated to Vitest
+- ~~`noImplicitAny: false`~~ - Enabled strict TypeScript (`noImplicitAny` + `strictNullChecks`)
+- ~~No tests for Point, BBox utilities~~ - Added test coverage (12 Point tests, 19 BBox tests)
 
 ### Remaining Issues
 
-**Critical:**
-- `noImplicitAny: false` allows unsafe typing
-
 **Code Quality:**
-- Minimal test coverage (5 test files)
-- No tests for Point, BBox, SVG generation utilities
-- Edge cases in pattern parsing not covered
-
-## Recommended Refactoring
-
-### 1. Enable Strict TypeScript
-
-Update `tsconfig.json` incrementally:
-```json
-{
-  "compilerOptions": {
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strict": true
-  }
-}
-```
-
-This will surface type errors that need fixing, particularly around optional properties and null handling.
-
-### 2. Add Missing Tests
-
-Priority areas lacking test coverage:
-- `src/lib/Point.ts` - Transform operations
-- `src/lib/BBox.ts` - Bounding box calculations
-- `src/lib/svg.ts` - SVG generation
-- Edge cases in pattern parsing (malformed DXF files, missing fields)
+- No tests for SVG generation utilities (svg.ts is a script, not a testable module)
+- Edge cases in pattern parsing not covered (malformed DXF files, missing fields)
 
 ## ASTM Layer Reference
 

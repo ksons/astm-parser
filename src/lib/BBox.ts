@@ -17,14 +17,19 @@ export class BBox {
   }
 
   addToBox(x: number | Point, y?: number) {
+    let xVal: number;
+    let yVal: number;
     if (typeof x === 'object') {
-      y = x.y;
-      x = x.x;
+      xVal = x.x;
+      yVal = x.y;
+    } else {
+      xVal = x;
+      yVal = y!;
     }
-    this.max.x = x > this.max.x ? x : this.max.x;
-    this.max.y = y > this.max.y ? y : this.max.y;
-    this.min.x = x < this.min.x ? x : this.min.x;
-    this.min.y = y < this.min.y ? y : this.min.y;
+    this.max.x = xVal > this.max.x ? xVal : this.max.x;
+    this.max.y = yVal > this.max.y ? yVal : this.max.y;
+    this.min.x = xVal < this.min.x ? xVal : this.min.x;
+    this.min.y = yVal < this.min.y ? yVal : this.min.y;
   }
 
   merge(other: BBox) {

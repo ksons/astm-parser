@@ -1,10 +1,21 @@
-import * as d3 from 'd3';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const d3 = require('d3') as { scaleSequential: (interpolator: unknown) => { domain: (domain: number[]) => (value: number) => string }; interpolateWarm: unknown };
 import * as fs from 'fs';
 import * as path from 'path';
+// @ts-expect-error - pretty-data has no type declarations
 import * as pd from 'pretty-data';
 
 import { ASTMParser, Units } from '../index.js';
 import { BBox } from './BBox.js';
+import type { IShape } from './PatternPiece.js';
+
+// Type for text annotation entities
+interface ITextAnnotation {
+  startPoint?: { x: number; y: number };
+  rotation?: number;
+  textHeight?: number;
+  text?: string;
+}
 
 const DXF_FILE_PATH = path.join(__dirname, '..', '..', 'test', 'data', 'dxf', 'GMG1016S19_ASTM.DXF');
 const fileStream = fs.createReadStream(DXF_FILE_PATH, { encoding: 'utf8' });
@@ -13,29 +24,29 @@ function roundToTwo(num: number) {
   return +(Math.round(+(num + 'e+2')) + 'e-2');
 }
 
-function generateText(text): string[] {
+function generateText(text: ITextAnnotation | null): string[] {
   if (!text) {
     return [];
   }
   let transformString = '';
-  if (Object.hasOwn(text, 'startPoint')) {
+  if (text.startPoint) {
     const x = text.startPoint.x;
     const y = -text.startPoint.y;
     transformString = `translate(${x} ${y})`;
   }
 
-  if (Object.hasOwn(text, 'rotation')) {
+  if (text.rotation !== undefined) {
     transformString += `rotate(${-text.rotation})`;
   }
   return [`<text  font-family="Verdana" transform="${transformString}" font-size="${text.textHeight}">${text.text}</text>`];
 }
 
-function generatePointsFromShape(shape, vertices: number[], bbox: BBox, size: number, unit: Units): string[] {
+function generatePointsFromShape(shape: IShape | null, vertices: number[], bbox: BBox, size: number, unit: Units): string[] {
   if (!shape) {
     return [];
   }
   let i = 0;
-  const circles = [];
+  const circles: string[] = [];
 
   shape.lengths.forEach(len => {
     if (len !== 1) {
@@ -57,13 +68,13 @@ function generatePointsFromShape(shape, vertices: number[], bbox: BBox, size: nu
   return circles;
 }
 
-function generateSegmentsFromShape(shape, vertices: number[], bbox: BBox): string[] {
+function generateSegmentsFromShape(shape: IShape | null, vertices: number[], bbox: BBox): string[] {
   if (!shape) {
     return [];
   }
 
   let i = 0;
-  const da = [];
+  const da: string[] = [];
 
   shape.lengths.forEach(len => {
     let d = '';
@@ -81,7 +92,7 @@ function generateSegmentsFromShape(shape, vertices: number[], bbox: BBox): strin
   return da;
 }
 
-function generatePathFromShape(shape, vertices: number[], bbox: BBox): string {
+function generatePathFromShape(shape: IShape | null, vertices: number[], bbox: BBox): string {
   if (!shape) {
     return '';
   }
@@ -115,7 +126,7 @@ const parser = new ASTMParser();
   let layerStr = '';
   let layerCount = 0;
   data.pieces.forEach(piece => {
-    const layers = {
+    const layers: Record<string, { svg: string[]; name: string }> = {
       annotations: { svg: [], name: 'annotations' },
       bounderies: { svg: [], name: 'bounderies' },
       internalShapes: { svg: [], name: 'internal' },
