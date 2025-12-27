@@ -1,11 +1,10 @@
 import * as d3 from 'd3';
-import * as d3c from 'd3-scale-chromatic';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as pd from 'pretty-data';
 
-import { ASTMParser, Units } from '..';
-import { BBox } from './BBox';
+import { ASTMParser, Units } from '../index.js';
+import { BBox } from './BBox.js';
 
 const DXF_FILE_PATH = path.join(__dirname, '..', '..', 'test', 'data', 'dxf', 'GMG1016S19_ASTM.DXF');
 const fileStream = fs.createReadStream(DXF_FILE_PATH, { encoding: 'utf8' });
@@ -19,13 +18,13 @@ function generateText(text): string[] {
     return [];
   }
   let transformString = '';
-  if (text.hasOwnProperty('startPoint')) {
+  if (Object.hasOwn(text, 'startPoint')) {
     const x = text.startPoint.x;
     const y = -text.startPoint.y;
     transformString = `translate(${x} ${y})`;
   }
 
-  if (text.hasOwnProperty('rotation')) {
+  if (Object.hasOwn(text, 'rotation')) {
     transformString += `rotate(${-text.rotation})`;
   }
   return [`<text  font-family="Verdana" transform="${transformString}" font-size="${text.textHeight}">${text.text}</text>`];
@@ -104,12 +103,9 @@ function generatePathFromShape(shape, vertices: number[], bbox: BBox): string {
 }
 
 const parser = new ASTMParser();
-parser.parseStream(fileStream, (err, res) => {
-  if (err) {
-    console.error(err);
-    return;
-  }
 
+(async () => {
+  const res = await parser.parseStream(fileStream);
   const data = res.data;
   const baseSize = +data.style.baseSize;
   const unit = data.asset.unit;
@@ -218,4 +214,4 @@ parser.parseStream(fileStream, (err, res) => {
   svgString += '</svg>';
 
   console.log(pd.pd.xml(svgString));
-});
+})().catch(console.error);

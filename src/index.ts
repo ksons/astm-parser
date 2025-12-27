@@ -1,18 +1,14 @@
-import DXFParser, { IDxf, IEntity, ITextEntity } from 'dxf-parser';
+import DXFParser, { IEntity, ITextEntity } from 'dxf-parser';
 import * as fs from 'fs';
-import { Diagnostic, Severity } from './lib/Diagnostic';
-import { ASTMLayers, IPatternPiece } from './lib/interfaces';
-import { PatternPiece } from './lib/PatternPiece';
+import { Diagnostic, Severity } from './lib/Diagnostic.js';
+import { IPatternPiece } from './lib/interfaces.js';
+import { PatternPiece } from './lib/PatternPiece.js';
 
 export const enum Units {
   MM = 1,
   INCH = 2
 }
 
-interface IVertex {
-  x: number;
-  y: number;
-}
 
 export interface IAsset {
   authoringTool: string;
@@ -43,21 +39,9 @@ export interface IReturnValue {
 class ASTMParser {
   diagnostics: Diagnostic[] = [];
 
-  parseStream(stream: fs.ReadStream, callback: (err: Error, msg: IReturnValue) => void) {
+  async parseStream(stream: fs.ReadStream): Promise<IReturnValue> {
     const parser = new DXFParser();
-    parser.parseStream(stream)
-      .then((dxf: IDxf) => {
-        this._transform(callback, null, dxf);
-      })
-      .catch((e: Error) => {
-        callback(e, null);
-      });
-  }
-
-  private _transform(callback: (err: Error, msg?: IReturnValue) => void, err: Error, dxf: IDxf) {
-    if (err) {
-      callback(err);
-    }
+    const dxf = await parser.parseStream(stream);
 
     const pieceMap = new Map<string, PatternPiece>();
     const sizeSet = new Set<string>();
@@ -102,9 +86,11 @@ class ASTMParser {
       unit: this._findUnit(dxf.entities)
     };
 
-    // console.log(asset);
-    err = foundError ? new Error(this.diagnostics.map(diag => diag.message).join('\n')) : null;
-    const ret: IReturnValue = {
+    if (foundError) {
+      throw new Error(this.diagnostics.map(diag => diag.message).join('\n'));
+    }
+
+    return {
       data: {
         asset,
         pieces: Array.from(pieceMap.values()),
@@ -113,8 +99,6 @@ class ASTMParser {
       },
       diagnostics: this.diagnostics
     };
-
-    callback(err, ret);
   }
 
   private _findUnit(entities: IEntity[]): Units {
@@ -146,10 +130,6 @@ class ASTMParser {
     }
     return '';
   }
-}
-
-function isText(entity: IEntity): entity is ITextEntity {
-  return entity.type === 'TEXT';
 }
 
 function getTextKeyValue(entity: ITextEntity): { key: string; value: string } | null {

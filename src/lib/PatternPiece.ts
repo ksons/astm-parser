@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
-import * as DXF from '../dxf';
-import { Diagnostic, Severity } from './Diagnostic';
-import { ASTMLayers, IPatternPiece } from './interfaces';
+import * as DXF from '../dxf.js';
+import { Diagnostic, Severity } from './Diagnostic.js';
+import { ASTMLayers, IPatternPiece } from './interfaces.js';
 
 interface IShape {
   lengths: number[];
@@ -86,7 +86,7 @@ export class PatternPiece implements IPatternPiece {
     });
   }
 
-  private _createBoundery(entities: DXF.BlockEntity[], diagnostics: Diagnostic[]): IShape {
+  private _createBoundery(entities: DXF.BlockEntity[], _diagnostics: Diagnostic[]): IShape {
     const shape: IShape = { lengths: [], metadata: {}, vertices: [] };
     entities.filter(entity => entity.layer === ASTMLayers.Boundery.toString()).forEach(entity => {
       switch (entity.type) {
