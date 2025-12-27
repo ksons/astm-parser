@@ -1,4 +1,5 @@
-import * as _ from 'lodash';
+import lodash from 'lodash';
+const { omit } = lodash;
 import type {
   IEntity,
   IPoint,
@@ -209,7 +210,7 @@ export class PatternPiece implements IPatternPiece {
     let text = null;
     entities.filter(entity => entity.layer === layer.toString()).forEach(entity => {
       if (isTextEntity(entity)) {
-        text = _.omit(entity, ['type', 'layer', 'handle']);
+        text = omit(entity, ['type', 'layer', 'handle']);
       } else {
         diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
       }

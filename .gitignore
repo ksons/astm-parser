@@ -5,3 +5,5 @@ dist
 # CLAUDE related items
 CLAUDE.md
 .claude/
+
+test/data/*

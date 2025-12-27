@@ -15,7 +15,7 @@ Parses ASTM (American Society of Testing and Materials) and AAMA (American Appar
 | dxf-parser | 1.1.2 | DXF file parsing (Promise-based API) |
 | d3 | 7.9.0 | Pattern visualization |
 | lodash | 4.17.21 | Utility functions |
-| Mocha/Chai | 11.7.5/6.2.2 | Testing |
+| Vitest | 3.2.4 | Testing framework |
 | ESLint | 9.x | Linting (flat config) |
 
 ## Project Structure
@@ -24,7 +24,6 @@ Parses ASTM (American Society of Testing and Materials) and AAMA (American Appar
 astm-parser/
 ├── src/
 │   ├── index.ts              # Main ASTMParser class (async API)
-│   ├── dxf.d.ts              # Legacy DXF type definitions
 │   └── lib/
 │       ├── PatternPiece.ts   # Core pattern piece logic
 │       ├── Diagnostic.ts     # Error/warning reporting
@@ -35,139 +34,17 @@ astm-parser/
 ├── test/
 │   ├── parse.ts              # Gerber AccuMark tests
 │   ├── clo.ts                # CLO Virtual Fashion tests
-│   └── data/dxf/             # 33+ sample DXF files
+│   ├── mirror.ts             # Mirror line tests
+│   ├── annotation-text.ts    # Annotation tests
+│   ├── drill-holes.ts        # Drill hole tests
+│   ├── parse-all.ts          # Batch parsing script
+│   └── data/dxf/             # Sample DXF files
 ├── schema/                   # JSON Schema definitions
+├── vitest.config.ts          # Vitest configuration
 ├── package.json
 ├── tsconfig.json
 └── eslint.config.js
 ```
-
-## Recent Changes (December 2024)
-
-### Dependencies Upgraded
-All major dependencies updated to latest versions:
-- TypeScript 2.6 → 5.9.3
-- dxf-parser 0.5.1 → 1.1.2
-- d3 4.13 → 7.9.0
-- Mocha 5.0 → 11.7.5
-- Chai 4.1 → 6.2.2
-
-### Code Changes
-
-**`src/index.ts`:**
-- Updated import to use default export: `import DXFParser from 'dxf-parser'`
-- Modernized to async/await: `parseStream()` now returns `Promise<IReturnValue>`
-- Added proper type imports from dxf-parser (`IEntity`, `ITextEntity`)
-
-**`tsconfig.json`:**
-- Updated to ESM: `module: "nodenext"`, `moduleResolution: "nodenext"`
-- Target updated to `es2022`
-- Added `esModuleInterop: true` and `skipLibCheck: true`
-
-**`package.json`:**
-- Added `"type": "module"` for ESM support
-- Migrated from TSLint to ESLint with flat config
-- Using `tsx` for test execution (Windows ESM compatibility)
-
-### Breaking Changes
-The `parseStream()` method now returns a Promise instead of using callbacks:
-```typescript
-// Old API
-parser.parseStream(stream, (err, res) => { ... });
-
-// New API
-const res = await parser.parseStream(stream);
-```
-
-## Tech Debt
-
-### Fixed
-- ~~All dependencies 7+ years outdated~~ - Updated to latest versions
-- ~~`@ts-ignore` comment in index.ts~~ - Removed, proper imports used
-- ~~TSLint deprecated~~ - Migrated to ESLint with flat config
-- ~~Callback-based API~~ - Modernized to async/await
-- ~~Unused `opf.ts` skeleton~~ - Removed
-- ~~Unused `isText()` function~~ - Removed
-
-### Remaining Issues
-
-**Critical:**
-- `noImplicitAny: false` allows unsafe typing
-
-**Code Quality:**
-- Minimal test coverage (5 test files for 33+ DXF samples)
-- No tests for Point, BBox, SVG generation utilities
-- Duplicate type definitions in `src/dxf.d.ts` (shadows dxf-parser types)
-
-## Recommended Refactoring
-
-### 1. Migrate Types from Local to dxf-parser
-
-The project maintains duplicate type definitions in `src/dxf.d.ts` that shadow the types exported by dxf-parser. This causes type incompatibilities requiring `as any` casts.
-
-**Files to update:**
-- `src/lib/PatternPiece.ts` - Change `import * as DXF from '../dxf.js'` to use dxf-parser types
-- `src/dxf.d.ts` - Can be removed once PatternPiece is migrated
-
-**Example migration:**
-```typescript
-// Before
-import * as DXF from '../dxf.js';
-createSize(size: string, entities: DXF.BlockEntity[]): Diagnostic[]
-
-// After
-import { IEntity } from 'dxf-parser';
-createSize(size: string, entities: IEntity[]): Diagnostic[]
-```
-
-### 2. Enable Strict TypeScript
-
-Update `tsconfig.json` incrementally:
-```json
-{
-  "compilerOptions": {
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strict": true
-  }
-}
-```
-
-This will surface type errors that need fixing, particularly around optional properties and null handling.
-
-### 3. Migrate from Mocha to Vitest
-
-Vitest provides better ESM and TypeScript support out of the box, eliminating the need for `tsx` workarounds.
-
-```bash
-npm uninstall mocha chai @types/mocha @types/chai ts-node
-npm install --save-dev vitest
-```
-
-**Benefits:**
-- Native ESM support (no Windows path issues)
-- Built-in TypeScript support (no loader configuration)
-- Faster execution with native ESM
-- Compatible with Jest API (`describe`, `it`, `expect`)
-
-**Migration:**
-```typescript
-// Before (Chai)
-import { expect } from 'chai';
-expect(result).to.have.property('asset');
-
-// After (Vitest)
-import { expect } from 'vitest';
-expect(result).toHaveProperty('asset');
-```
-
-### 4. Add Missing Tests
-
-Priority areas lacking test coverage:
-- `src/lib/Point.ts` - Transform operations
-- `src/lib/BBox.ts` - Bounding box calculations
-- `src/lib/svg.ts` - SVG generation
-- Edge cases in pattern parsing (malformed DXF files, missing fields)
 
 ## Quick Start
 
@@ -191,5 +68,117 @@ The compiled output is written to `dist/`.
 |---------|-------------|
 | `npm test` | Run all tests |
 | `npm run test:watch` | Run tests in watch mode |
+| `npm run parse:all` | Parse all DXF files and generate report |
 | `npm run lint` | Run ESLint |
 | `npm run format` | Format code with Prettier |
+
+## Batch Processing
+
+Parse all DXF files in the current directory tree:
+
+```bash
+npm run parse:all
+```
+
+Produces a report showing:
+- Summary of successful/failed parses
+- Table of parsed files with piece counts, sizes, and diagnostics
+- Failed files with error messages
+- Top diagnostic messages grouped by frequency
+
+## API Usage
+
+```typescript
+import { ASTMParser } from 'astm-parser';
+import * as fs from 'fs';
+
+const parser = new ASTMParser();
+const stream = fs.createReadStream('pattern.dxf', { encoding: 'utf8' });
+const result = await parser.parseStream(stream);
+
+console.log(result.data.pieces);      // Pattern pieces
+console.log(result.data.sizes);       // Available sizes
+console.log(result.data.asset);       // Authoring tool metadata
+console.log(result.diagnostics);      // Warnings and errors
+```
+
+## Recent Changes (December 2024)
+
+### Type System Migration
+- Removed local `src/dxf.d.ts` type definitions
+- Now uses types directly from `dxf-parser` package (`IEntity`, `ITextEntity`, `IPointEntity`, etc.)
+- Added type guards for entity type narrowing in PatternPiece.ts
+- Exported `BlockEntity` union type for external use
+
+### Test Framework Migration
+- Migrated from Mocha/Chai to Vitest
+- Updated all test files to use Vitest assertions (`toHaveProperty`, `toEqual`, etc.)
+- Replaced `before()` hooks with `beforeAll()`
+- Removed callback-style tests in favor of synchronous assertions
+
+### Code Modernization
+- Converted `parse-all.js` to TypeScript with proper error handling
+- Updated lodash imports for ESM compatibility
+- Added batch processing report with diagnostic summaries
+
+## Tech Debt
+
+### Fixed
+- ~~All dependencies 7+ years outdated~~ - Updated to latest versions
+- ~~`@ts-ignore` comment in index.ts~~ - Removed, proper imports used
+- ~~TSLint deprecated~~ - Migrated to ESLint with flat config
+- ~~Callback-based API~~ - Modernized to async/await
+- ~~Duplicate type definitions in `src/dxf.d.ts`~~ - Now uses dxf-parser types
+- ~~Mocha/Chai testing~~ - Migrated to Vitest
+
+### Remaining Issues
+
+**Critical:**
+- `noImplicitAny: false` allows unsafe typing
+
+**Code Quality:**
+- Minimal test coverage (5 test files)
+- No tests for Point, BBox, SVG generation utilities
+- Edge cases in pattern parsing not covered
+
+## Recommended Refactoring
+
+### 1. Enable Strict TypeScript
+
+Update `tsconfig.json` incrementally:
+```json
+{
+  "compilerOptions": {
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strict": true
+  }
+}
+```
+
+This will surface type errors that need fixing, particularly around optional properties and null handling.
+
+### 2. Add Missing Tests
+
+Priority areas lacking test coverage:
+- `src/lib/Point.ts` - Transform operations
+- `src/lib/BBox.ts` - Bounding box calculations
+- `src/lib/svg.ts` - SVG generation
+- Edge cases in pattern parsing (malformed DXF files, missing fields)
+
+## ASTM Layer Reference
+
+| Layer | Purpose | Status | Output Property |
+|-------|---------|--------|-----------------|
+| 1 | Boundary (pattern outline) | Handled | `shapes` |
+| 2 | Turn Points | Handled | `turnPoints` |
+| 3 | Curve Points | Handled | `curvePoints` |
+| 4 | Notches | Handled | `notches` |
+| 5 | Grade Reference | Handled | `gradeReferences` |
+| 6 | Mirror Line | Handled | `mirrorLines` |
+| 7 | Grain Line | Handled | `grainLines` |
+| 8 | Internal Lines | Handled | `internalShapes` |
+| 13 | Drill Holes | Handled | `drillHoles` |
+| 15 | Annotation Text | Handled | `annotations` |
+| 84 | ASTM Boundary (alternative) | Not handled | Logged as diagnostic |
+| 85 | ASTM Internal Lines (alternative) | Not handled | Logged as diagnostic |
