@@ -1,13 +1,14 @@
 {
   "name": "open-patterns",
   "private": true,
+  "type": "module",
   "description": "Open Pattern Format tools monorepo",
   "workspaces": ["packages/*"],
   "scripts": {
     "build": "npm run build --workspaces",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint packages/*/src packages/*/test",
+    "lint": "eslint \"packages/**/src/**/*.ts\" \"packages/**/test/**/*.ts\"",
     "format": "prettier --write \"packages/*/src/**/*.ts\" \"packages/*/test/**/*.ts\""
   },
   "keywords": [

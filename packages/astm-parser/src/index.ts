@@ -1,7 +1,7 @@
 import DxfParser, { IEntity, ITextEntity } from 'dxf-parser';
 import * as fs from 'fs';
 import { Diagnostic, Severity } from './lib/Diagnostic.js';
-import { BlockEntity, PatternPiece, IShape } from './lib/PatternPiece.js';
+import { BlockEntity, PatternPiece } from './lib/PatternPiece.js';
 import { IPatternPiece } from './lib/interfaces.js';
 
 export type { IPatternPiece } from './lib/interfaces.js';
