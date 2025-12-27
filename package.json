@@ -5,7 +5,7 @@
   "description": "Open Pattern Format tools monorepo",
   "workspaces": ["packages/*"],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build -w @open-patterns/astm-parser && npm run build -w @open-patterns/opf2svg && npm run build -w @open-patterns/cli",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint \"packages/**/src/**/*.ts\" \"packages/**/test/**/*.ts\"",

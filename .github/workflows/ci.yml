@@ -33,4 +33,7 @@ jobs:
         run: npm test
 
       - name: Build
-        run: npm run build --workspaces
+        run: |
+          npm run build -w @open-patterns/astm-parser
+          npm run build -w @open-patterns/opf2svg
+          npm run build -w @open-patterns/cli
