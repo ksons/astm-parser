@@ -1,7 +1,5 @@
+# Ignore node modules and distribution files
 node_modules
-test
-mocha.opts
-
 dist
 
 # CLAUDE related items
