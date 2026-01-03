@@ -86,7 +86,7 @@ npm test
 
 ```bash
 # Parse DXF to JSON
-npx opf parse pattern.dxf
+npx opf parse packages/astm-parser/test/data/dxf/pattern.dxf
 npx opf parse pattern.dxf -o pattern.json
 
 # Generate SVG

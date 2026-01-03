@@ -9,7 +9,7 @@ import type {
   ILineEntity,
 } from 'dxf-parser';
 import { Diagnostic, Severity } from './Diagnostic.js';
-import { ASTMLayers, IPatternPiece } from './interfaces.js';
+import { ASTMLayers, IPatternPiece, IShape } from './interfaces.js';
 
 // BlockEntity union - IEntity is the base type for unknown entities
 export type BlockEntity = ITextEntity | IPointEntity | IPolylineEntity | ILineEntity | IEntity;
@@ -28,15 +28,9 @@ function isPointEntity(entity: BlockEntity): entity is IPointEntity {
   return entity.type === 'POINT';
 }
 
-export interface IShapeMetadata {
-  astm?: string[];
-}
 
-export interface IShape {
-  lengths: number[];
-  vertices: number[];
-  metadata?: IShapeMetadata;
-}
+
+
 
 export class PatternPiece implements IPatternPiece {
   annotations: Record<string, object | null> = {};
@@ -72,6 +66,21 @@ export class PatternPiece implements IPatternPiece {
     this._checkBlock(entities, diagnostics);
 
     return diagnostics;
+  }
+
+  private _addTextAnnotation(shape: IShape, entity: ITextEntity) {
+    if (!shape.metadata) {
+      shape.metadata = {};
+    }
+    if (!shape.metadata.textAnnotations) {
+      shape.metadata.textAnnotations = [];
+    }
+    shape.metadata.textAnnotations.push({
+      text: entity.text,
+      position: entity.startPoint ? { x: entity.startPoint.x, y: entity.startPoint.y } : undefined,
+      height: entity.textHeight,
+      rotation: entity.rotation,
+    });
   }
 
   private _getVertexIndex(vertex: IPoint) {
@@ -129,13 +138,7 @@ export class PatternPiece implements IPatternPiece {
           shape.vertices.push(this._getVertexIndex(vertex));
         });
       } else if (isTextEntity(entity)) {
-        if (!shape.metadata) {
-          shape.metadata = {};
-        }
-        if (!shape.metadata.astm) {
-          shape.metadata.astm = [];
-        }
-        shape.metadata.astm.push(entity.text);
+        this._addTextAnnotation(shape, entity);
       }
     });
 
@@ -154,13 +157,7 @@ export class PatternPiece implements IPatternPiece {
         shape.vertices.push(this._getVertexIndex(entity.vertices[0]));
         shape.vertices.push(this._getVertexIndex(entity.vertices[1]));
       } else if (isTextEntity(entity)) {
-        if (!shape.metadata) {
-          shape.metadata = {};
-        }
-        if (!shape.metadata.astm) {
-          shape.metadata.astm = [];
-        }
-        shape.metadata.astm.push(entity.text);
+        this._addTextAnnotation(shape, entity);
       } else {
         diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in turn points: '${entity.type}'`, entity));
       }
@@ -175,13 +172,7 @@ export class PatternPiece implements IPatternPiece {
         shape.lengths.push(1);
         shape.vertices.push(this._getVertexIndex(entity.position));
       } else if (isTextEntity(entity)) {
-        if (!shape.metadata) {
-          shape.metadata = {};
-        }
-        if (!shape.metadata.astm) {
-          shape.metadata.astm = [];
-        }
-        shape.metadata.astm.push(entity.text);
+        this._addTextAnnotation(shape, entity);
       } else {
         diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected entity in layer ${layer}: expected points, found '${entity.type}'`, entity));
       }
@@ -203,13 +194,7 @@ export class PatternPiece implements IPatternPiece {
           shape.vertices.push(this._getVertexIndex(vertex));
         });
       } else if (isTextEntity(entity)) {
-        if (!shape.metadata) {
-          shape.metadata = {};
-        }
-        if (!shape.metadata.astm) {
-          shape.metadata.astm = [];
-        }
-        shape.metadata.astm.push(entity.text);
+        this._addTextAnnotation(shape, entity);
       } else {
         diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected type in internal shape: '${entity.type}'`, entity));
       }

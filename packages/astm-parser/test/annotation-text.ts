@@ -2,11 +2,11 @@ import { describe, it, beforeAll, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { ASTMParser } from '../src/index.js';
+import { ASTMParser, Diagnostic, IOpenPatternFormat } from '../src/index.js';
 
 describe('ASTM with annotation text', () => {
-  let result;
-  let diagnostics;
+  let result: IOpenPatternFormat;
+  let diagnostics: Diagnostic[];
 
   beforeAll(async () => {
     const DXF_FILE_PATH = path.join(__dirname, 'data', 'dxf', 'annotation.DXF');
@@ -50,6 +50,6 @@ describe('ASTM with annotation text', () => {
     const annotation = piece.annotations[52];
     console.log(annotation);
     expect(annotation).toBeTypeOf('object');
-    expect(annotation.text).toBe('Neckline Full Collar W/stand');
+    expect(annotation!.text).toBe('Neckline Full Collar W/stand');
   });
 });

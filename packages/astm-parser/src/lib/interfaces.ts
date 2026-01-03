@@ -1,5 +1,3 @@
-import type { IShape } from './PatternPiece.js';
-
 export const enum ASTMLayers {
   Boundery = 1,
   TurnPoints = 2,
@@ -14,6 +12,26 @@ export const enum ASTMLayers {
   ASTMBoundery = 84,
   ASTMInternalLines = 85
 }
+
+export interface TextAnnotation {
+  text: string;
+  position?: { x: number; y: number };
+  height?: number;
+  rotation?: number;
+}
+
+
+export interface IMetadata {
+  textAnnotations?: TextAnnotation[];
+}
+
+export interface IShape {
+  lengths: number[];
+  vertices: number[];
+  metadata?: IMetadata;
+}
+
+
 
 export interface IPatternPiece {
   name: string;

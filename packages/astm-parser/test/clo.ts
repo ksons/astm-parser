@@ -2,11 +2,11 @@ import { describe, it, beforeAll, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { ASTMParser } from '../src/index.js';
+import { ASTMParser, Diagnostic, IOpenPatternFormat } from '../src/index.js';
 
 describe('CLO file', () => {
-  let result;
-  let diagnostics;
+  let result: IOpenPatternFormat;
+  let diagnostics: Diagnostic[];
 
   beforeAll(async () => {
     const DXF_FILE_PATH = path.join(__dirname, 'data', 'dxf', 'clo-pattern.dxf');
@@ -72,21 +72,36 @@ describe('CLO file', () => {
     expect(piece.shapes).toBeTypeOf('object');
     expect(Object.keys(piece.shapes)).toEqual(expect.arrayContaining(result.sizes));
 
+
     const shape = piece.shapes.M;
     expect(shape).toBeTypeOf('object');
 
     expect(shape.vertices.length).toBe(148);
     expect(shape.vertices.length).toBe(shape.lengths.reduce((acc, prev) => acc + prev));
+
+    // Shape metadata
+    expect(shape).toHaveProperty('metadata');
+    expect(shape.metadata).toBeTypeOf('object');
+    expect(shape.metadata).toHaveProperty('textAnnotations');
+    expect(Array.isArray(shape.metadata?.textAnnotations)).toBe(true);
+    expect(shape.metadata?.textAnnotations).toHaveLength(4);
+    const annotations = shape.metadata!.textAnnotations!;
+    expect(annotations[0]).toEqual({
+      text: 'PIECE NAME: 11',
+      position: { x: 192.148163, y: 1244.616211 },
+      height: undefined,
+      rotation: 0
+    });
   });
 
   it('should contain internal shapes', () => {
     // Shapes
     const piece = result.pieces.find(p => p.name === '11');
     expect(piece).toHaveProperty('internalShapes');
-    expect(piece.internalShapes).toBeTypeOf('object');
-    expect(Object.keys(piece.internalShapes)).toEqual(expect.arrayContaining(result.sizes));
+    expect(piece!.internalShapes).toBeTypeOf('object');
+    expect(Object.keys(piece!.internalShapes)).toEqual(expect.arrayContaining(result.sizes));
 
-    const shape = piece.internalShapes.M;
+    const shape = piece!.internalShapes.M;
     expect(shape).toBeTypeOf('object');
     expect(shape.vertices.length).toBe(22);
     expect(shape.vertices.length).toBe(shape.lengths.reduce((acc, prev) => acc + prev));
@@ -95,11 +110,12 @@ describe('CLO file', () => {
   it('should contain grain lines', () => {
     // Shapes
     const piece = result.pieces.find(p => p.name === '11');
+    expect(piece).toBeDefined();
     expect(piece).toHaveProperty('grainLines');
-    expect(piece.grainLines).toBeTypeOf('object');
-    expect(Object.keys(piece.grainLines)).toEqual(expect.arrayContaining(result.sizes));
+    expect(piece!.grainLines).toBeTypeOf('object');
+    expect(Object.keys(piece!.grainLines)).toEqual(expect.arrayContaining(result.sizes));
 
-    const shape = piece.grainLines.M;
+    const shape = piece!.grainLines.M;
     expect(shape.vertices.length).toBe(2);
     expect(shape.vertices.length).toBe(shape.lengths.reduce((acc, prev) => acc + prev));
   });

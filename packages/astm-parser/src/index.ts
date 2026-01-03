@@ -1,17 +1,17 @@
-import DxfParser, { IEntity, ITextEntity } from 'dxf-parser';
+import DxfParser, { IDxf, IEntity, ITextEntity } from 'dxf-parser';
 import * as fs from 'fs';
 import { Diagnostic, Severity } from './lib/Diagnostic.js';
 import { BlockEntity, PatternPiece } from './lib/PatternPiece.js';
 import { IPatternPiece } from './lib/interfaces.js';
 
-export type { IPatternPiece } from './lib/interfaces.js';
-export type { IShape } from './lib/PatternPiece.js';
+export type { IPatternPiece, IShape } from './lib/interfaces.js';
 
 export const enum Units {
   MM = 1,
   INCH = 2
 }
 
+export type { Diagnostic, Severity } from './lib/Diagnostic.js';
 
 export interface IAsset {
   authoringTool: string;
@@ -44,9 +44,9 @@ class ASTMParser {
 
   async parseStream(stream: fs.ReadStream): Promise<IReturnValue> {
     // @ts-expect-error - ESM/CJS interop issue with dxf-parser default export
-    const parser = new DxfParser();
-    const dxf = await parser.parseStream(stream);
-
+    const parser: DxfParser = new DxfParser();
+    const dxf: IDxf = await parser.parseStream(stream);
+    
     const pieceMap = new Map<string, PatternPiece>();
     const sizeSet = new Set<string>();
     let foundError = false;
@@ -70,7 +70,7 @@ class ASTMParser {
         pieceMap.set(name, actualPiece);
       }
       const diag = actualPiece.createSize(size, block.entities as BlockEntity[]);
-      Array.prototype.push.apply(this.diagnostics, diag);
+      this.diagnostics.push(...diag);
     });
 
     const baseSizeStr = this._findKey(dxf.entities, 'sample size');
