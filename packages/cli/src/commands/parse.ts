@@ -4,6 +4,7 @@ import { ASTMParser } from '@open-patterns/astm-parser';
 interface ParseOptions {
   output?: string;
   pretty?: boolean;
+  diagnostics?: boolean;
 }
 
 export async function parse(args: string[], options: ParseOptions): Promise<void> {
@@ -30,7 +31,7 @@ export async function parse(args: string[], options: ParseOptions): Promise<void
     console.log(jsonOutput);
   }
 
-  if (result.diagnostics.length > 0) {
+  if (options.diagnostics !== false && result.diagnostics.length > 0) {
     console.error(`\nDiagnostics (${result.diagnostics.length}):`);
     result.diagnostics.forEach((d) => {
       console.error(`  - ${d.message}`);

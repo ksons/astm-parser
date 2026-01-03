@@ -10,6 +10,8 @@ const { values, positionals } = parseArgs({
     help: { type: 'boolean', short: 'h' },
     output: { type: 'string', short: 'o' },
     pretty: { type: 'boolean', short: 'p', default: true },
+    diagnostics: { type: 'boolean' },
+    'no-diagnostics': { type: 'boolean' },
     format: { type: 'string', short: 'f' },
     width: { type: 'string', short: 'w' },
     scale: { type: 'string', short: 's' },
@@ -35,6 +37,7 @@ Commands:
 Options:
   -o, --output <file>   Output file (default: stdout)
   -p, --pretty          Pretty-print output (default: true)
+      --no-diagnostics  Omit diagnostic output
   -h, --help            Show this help message
 
 SVG/Image options:
@@ -64,13 +67,20 @@ async function main() {
     process.exit(values.help ? 0 : 1);
   }
 
+  const diagnostics =
+    values.diagnostics === true
+      ? true
+      : values['no-diagnostics'] === true
+        ? false
+        : true;
+
   try {
     switch (command) {
       case 'parse':
-        await parse(args, values);
+        await parse(args, { ...values, diagnostics });
         break;
       case 'svg':
-        await svg(args, { ...values, size: values.size, base: values.base });
+        await svg(args, { ...values, size: values.size, base: values.base, diagnostics });
         break;
       case 'image':
         await image(args, {
@@ -80,6 +90,7 @@ async function main() {
           scale: values.scale ? parseFloat(values.scale) : undefined,
           size: values.size,
           base: values.base,
+          diagnostics,
         });
         break;
       default:

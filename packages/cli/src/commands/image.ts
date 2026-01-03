@@ -12,6 +12,7 @@ interface ImageOptions {
   scale?: number;
   size?: string;
   base?: boolean;
+  diagnostics?: boolean;
 }
 
 export async function image(args: string[], options: ImageOptions): Promise<void> {
@@ -73,7 +74,7 @@ export async function image(args: string[], options: ImageOptions): Promise<void
     process.stdout.write(outputBuffer);
   }
 
-  if (result.diagnostics.length > 0) {
+  if (options.diagnostics !== false && result.diagnostics.length > 0) {
     console.error(`\nDiagnostics (${result.diagnostics.length}):`);
     result.diagnostics.forEach((d) => {
       console.error(`  - ${d.message}`);

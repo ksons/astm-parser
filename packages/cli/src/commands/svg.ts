@@ -7,6 +7,7 @@ interface SVGOptions {
   pretty?: boolean;
   size?: string;
   base?: boolean;
+  diagnostics?: boolean;
 }
 
 export async function svg(args: string[], options: SVGOptions): Promise<void> {
@@ -44,7 +45,7 @@ export async function svg(args: string[], options: SVGOptions): Promise<void> {
     console.log(svgOutput);
   }
 
-  if (result.diagnostics.length > 0) {
+  if (options.diagnostics !== false && result.diagnostics.length > 0) {
     console.error(`\nDiagnostics (${result.diagnostics.length}):`);
     result.diagnostics.forEach((d) => {
       console.error(`  - ${d.message}`);
