@@ -11,7 +11,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc"
   },
@@ -25,10 +27,6 @@
   "author": "Kristian Sons",
   "license": "ISC",
   "dependencies": {
-    "dxf-parser": "^1.1.2",
-    "lodash": "^4.17.21"
-  },
-  "devDependencies": {
-    "@types/lodash": "^4.17.21"
+    "dxf-parser": "^1.1.2"
   }
 }

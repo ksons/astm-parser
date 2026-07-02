@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     testTimeout: 10000,
     include: ['packages/*/test/**/*.ts'],
-    exclude: ['**/parse-all.ts'],
+    exclude: ['**/parse-all.ts', '**/helpers.ts'],
   },
 });

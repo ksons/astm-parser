@@ -35,7 +35,7 @@ open-patterns/
 │   │   ├── src/
 │   │   │   ├── index.ts       # ASTMParser class
 │   │   │   └── lib/
-│   │   │       ├── PatternPiece.ts
+│   │   │       ├── snapshot.ts
 │   │   │       ├── Diagnostic.ts
 │   │   │       └── interfaces.ts
 │   │   └── test/
@@ -143,15 +143,15 @@ npx opf image pattern.dxf -o pattern.jpg -f jpeg --size 36 -w 1200
 
 ```typescript
 import { ASTMParser } from '@open-patterns/astm-parser';
-import * as fs from 'fs';
 
 const parser = new ASTMParser();
-const stream = fs.createReadStream('pattern.dxf', { encoding: 'utf8' });
-const result = await parser.parseStream(stream);
+const result = await parser.parseFile('pattern.dxf');
+// also available: parser.parseString(content), parser.parseStream(stream)
 
+console.log(result.data.version); // OPF format version
 console.log(result.data.pieces); // Pattern pieces
 console.log(result.data.sizes); // Available sizes
-console.log(result.data.asset); // Authoring tool metadata
+console.log(result.data.asset); // Authoring tool metadata, unit ('mm' | 'inch')
 console.log(result.diagnostics); // Warnings and errors
 ```
 
@@ -163,8 +163,7 @@ import { generateSVG } from '@open-patterns/opf2svg';
 import * as fs from 'fs';
 
 const parser = new ASTMParser();
-const stream = fs.createReadStream('pattern.dxf', { encoding: 'utf8' });
-const result = await parser.parseStream(stream);
+const result = await parser.parseFile('pattern.dxf');
 
 const svg = generateSVG(result.data, {
   prettyPrint: true,
@@ -183,19 +182,40 @@ const selectedSizesSvg = generateSVG(result.data, {
 });
 ```
 
+## Open Pattern Format
+
+The parser emits **Open Pattern Format (OPF)**, a JSON representation of
+graded patterns designed to replace DXF/ASTM as an interchange format for
+downstream tooling. The format is documented in
+[docs/opf-spec.md](docs/opf-spec.md) and machine-validated by
+[schema/opf.schema.json](schema/opf.schema.json) (JSON Schema 2020-12).
+Every test fixture is round-tripped through the schema in CI.
+
 ## ASTM Layer Reference
 
-| Layer | Purpose                           | Status      | Output Property      |
-| ----- | --------------------------------- | ----------- | -------------------- |
-| 1     | Boundary (pattern outline)        | Handled     | `shapes`             |
-| 2     | Turn Points                       | Handled     | `turnPoints`         |
-| 3     | Curve Points                      | Handled     | `curvePoints`        |
-| 4     | Notches                           | Handled     | `notches`            |
-| 5     | Grade Reference                   | Handled     | `gradeReferences`    |
-| 6     | Mirror Line                       | Handled     | `mirrorLines`        |
-| 7     | Grain Line                        | Handled     | `grainLines`         |
-| 8     | Internal Lines                    | Handled     | `internalShapes`     |
-| 13    | Drill Holes                       | Handled     | `drillHoles`         |
-| 15    | Annotation Text                   | Handled     | `annotations`        |
-| 84    | ASTM Boundary (alternative)       | Not handled | Logged as diagnostic |
-| 85    | ASTM Internal Lines (alternative) | Not handled | Logged as diagnostic |
+All layers defined by ASTM D6673 / AAMA-292 are handled:
+
+Every piece holds one self-contained **size snapshot** per size; the
+properties below live inside the snapshot:
+
+| Layer | Purpose                             | Snapshot Property                   |
+| ----- | ----------------------------------- | ----------------------------------- |
+| 1     | Boundary (pattern outline)          | `boundary` (fragments chained into one closed contour) |
+| 2     | Turn Points                         | `turnPoints`                        |
+| 3     | Curve Points                        | `curvePoints`                       |
+| 4     | Notches (V/slit)                    | `notches`                           |
+| 5     | Grade Reference                     | `gradeReferences`                   |
+| 6     | Mirror Line                         | `mirrorLine`                        |
+| 7     | Grain Line                          | `grainLine`                         |
+| 8     | Internal Lines                      | `internalLines`                     |
+| 9     | Stripe Reference                    | `stripeReferences`                  |
+| 10    | Plaid Reference                     | `plaidReferences`                   |
+| 11    | Internal Cutouts                    | `internalCutouts`                   |
+| 13    | Drill Holes                         | `drillHoles`                        |
+| 14    | Sew Lines                           | `sewLines`                          |
+| 15    | Annotation Text                     | `annotations`                       |
+| 80–83 | T-/Castle/Check/U-Notches           | `notches` (typed)                   |
+| 84    | Boundary Quality Validation         | `qualityValidation.boundary`        |
+| 85    | Internal Lines Quality Validation   | `qualityValidation.internalLines`   |
+| 86    | Internal Cutouts Quality Validation | `qualityValidation.internalCutouts` |
+| 87    | Sew Lines Quality Validation        | `qualityValidation.sewLines`        |

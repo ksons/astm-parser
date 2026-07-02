@@ -2,26 +2,14 @@ import * as d3 from 'd3';
 // @ts-expect-error - pretty-data has no type declarations
 import * as pd from 'pretty-data';
 
-import type { IOpenPatternFormat, IPatternPiece } from '@open-patterns/astm-parser';
+import type {
+  IContour,
+  IOpenPatternFormat,
+  IPatternPiece,
+  ISizeSnapshot,
+  TextAnnotation,
+} from '@open-patterns/astm-parser';
 import { BBox } from './BBox.js';
-
-/**
- * Text annotation from pattern data
- */
-interface ITextAnnotation {
-  startPoint?: { x: number; y: number };
-  rotation?: number;
-  textHeight?: number;
-  text?: string;
-}
-
-/**
- * Shape data from pattern piece
- */
-interface IShape {
-  lengths: number[];
-  vertices: number[];
-}
 
 /**
  * Options for SVG generation
@@ -54,195 +42,188 @@ function roundToTwo(num: number): number {
   return +(Math.round(+(num + 'e+2')) + 'e-2');
 }
 
-function generateText(text: ITextAnnotation | null): string[] {
-  if (!text) {
-    return [];
-  }
-  let transformString = '';
-  if (text.startPoint) {
-    const x = text.startPoint.x;
-    const y = -text.startPoint.y;
-    transformString = `translate(${x} ${y})`;
-  }
-
-  if (text.rotation !== undefined) {
-    transformString += `rotate(${-text.rotation})`;
-  }
-  return [`<text font-family="Verdana" transform="${transformString}" font-size="${text.textHeight}">${text.text}</text>`];
+function escapeXML(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function generatePointsFromShape(
-  shape: IShape | null,
-  vertices: number[],
+/** Look up a pool vertex in SVG coordinates (y flipped) and track the bbox. */
+function vertexAt(vertices: number[], index: number, bbox: BBox): { x: number; y: number } {
+  const x = vertices[index * 2];
+  const y = -vertices[index * 2 + 1];
+  bbox.addToBox(x, y);
+  return { x, y };
+}
+
+/** Convert a contour to SVG path data (M/L/C/Z). */
+function contourToPath(contour: IContour, vertices: number[], bbox: BBox): string {
+  const start = vertexAt(vertices, contour.start, bbox);
+  let d = `M ${roundToTwo(start.x)} ${roundToTwo(start.y)} `;
+
+  for (const segment of contour.segments) {
+    if (segment.type === 'lines') {
+      for (const index of segment.to) {
+        const p = vertexAt(vertices, index, bbox);
+        d += `L ${roundToTwo(p.x)} ${roundToTwo(p.y)} `;
+      }
+    } else {
+      const c1 = vertexAt(vertices, segment.c1, bbox);
+      const c2 = vertexAt(vertices, segment.c2, bbox);
+      const to = vertexAt(vertices, segment.to, bbox);
+      d += `C ${roundToTwo(c1.x)} ${roundToTwo(c1.y)} ${roundToTwo(c2.x)} ${roundToTwo(c2.y)} ${roundToTwo(to.x)} ${roundToTwo(to.y)} `;
+    }
+  }
+  if (contour.closed) {
+    d += 'Z';
+  }
+  return d.trimEnd();
+}
+
+function circles(indices: number[], vertices: number[], bbox: BBox, size: string, unit: string, fill: string): string[] {
+  const radius = unit === 'inch' ? 2 / 25.4 : 2;
+  return indices.map(index => {
+    const p = vertexAt(vertices, index, bbox);
+    return `<circle class="size${size}" cx="${roundToTwo(p.x)}" cy="${roundToTwo(p.y)}" r="${radius}" fill="${fill}" />`;
+  });
+}
+
+function texts(annotations: TextAnnotation[], size: string): string[] {
+  return annotations
+    .filter(annotation => annotation.source === undefined)
+    .map(annotation => {
+      let transform = '';
+      if (annotation.position) {
+        transform = `translate(${annotation.position.x} ${-annotation.position.y})`;
+      }
+      if (annotation.rotation !== undefined) {
+        transform += `rotate(${-annotation.rotation})`;
+      }
+      return `<text class="size${size}" font-family="Verdana" transform="${transform}" font-size="${annotation.height}">${escapeXML(annotation.text)}</text>`;
+    });
+}
+
+interface ContourLayerStyle {
+  stroke: string;
+  dashArray?: string;
+}
+
+const CONTOUR_LAYERS: Array<{
+  key: 'internalLines' | 'internalCutouts' | 'sewLines' | 'stripeReferences' | 'plaidReferences' | 'gradeReferences';
+  name: string;
+  idPrefix: string;
+  style: ContourLayerStyle;
+}> = [
+  { key: 'internalLines', name: 'internal', idPrefix: 'internal', style: { stroke: 'blue' } },
+  { key: 'internalCutouts', name: 'internal cutouts', idPrefix: 'cutout', style: { stroke: 'purple' } },
+  { key: 'sewLines', name: 'sew lines', idPrefix: 'sewline', style: { stroke: 'magenta', dashArray: '4 2' } },
+  { key: 'stripeReferences', name: 'stripe references', idPrefix: 'stripe', style: { stroke: 'gray', dashArray: '8 4' } },
+  { key: 'plaidReferences', name: 'plaid references', idPrefix: 'plaid', style: { stroke: 'gray', dashArray: '2 2' } },
+  { key: 'gradeReferences', name: 'gradeReference', idPrefix: 'grade', style: { stroke: 'green' } },
+];
+
+const SINGLE_CONTOUR_LAYERS: Array<{
+  key: 'grainLine' | 'mirrorLine';
+  name: string;
+  idPrefix: string;
+  style: ContourLayerStyle;
+}> = [
+  { key: 'grainLine', name: 'grainLine', idPrefix: 'grainline', style: { stroke: 'black' } },
+  { key: 'mirrorLine', name: 'mirrorLine', idPrefix: 'mirror', style: { stroke: 'black' } },
+];
+
+const POINT_LAYERS: Array<{
+  key: 'turnPoints' | 'curvePoints' | 'drillHoles';
+  name: string;
+  fill: string;
+}> = [
+  { key: 'turnPoints', name: 'turn points', fill: 'red' },
+  { key: 'curvePoints', name: 'curve points', fill: 'red' },
+  { key: 'drillHoles', name: 'drillHoles', fill: 'red' },
+];
+
+function contourPathElement(
+  contour: IContour,
+  snapshot: ISizeSnapshot,
   bbox: BBox,
-  size: number,
-  unit: number
-): string[] {
-  if (!shape) {
-    return [];
-  }
-  let i = 0;
-  const circles: string[] = [];
-  const INCH_UNIT = 2;
-
-  shape.lengths.forEach(len => {
-    if (len !== 1) {
-      i += len;
-      return;
-    }
-    const vidx = shape.vertices[i];
-    const x = vertices[vidx * 2];
-    const y = -vertices[vidx * 2 + 1];
-    let r = 2;
-    if (unit === INCH_UNIT) {
-      r = r / 25.4;
-    }
-    const circleSVG = `<circle class="size${size}" cx="${roundToTwo(x)}" cy="${roundToTwo(y)}" r="${r}" fill="red" />`;
-    circles.push(circleSVG);
-    bbox.addToBox(x, y);
-    i++;
-  });
-  return circles;
-}
-
-function generateSegmentsFromShape(shape: IShape | null, vertices: number[], bbox: BBox): string[] {
-  if (!shape) {
-    return [];
-  }
-
-  let i = 0;
-  const da: string[] = [];
-
-  shape.lengths.forEach(len => {
-    let d = '';
-    for (let j = 0; j < len; j++) {
-      const vidx = shape.vertices[i];
-      const x = vertices[vidx * 2];
-      const y = -vertices[vidx * 2 + 1];
-      d += j !== 0 ? 'L ' : 'M ';
-      d += `${roundToTwo(x)} ${roundToTwo(y)} `;
-      bbox.addToBox(x, y);
-      i++;
-    }
-    da.push(d);
-  });
-  return da;
-}
-
-function generatePathFromShape(shape: IShape | null, vertices: number[], bbox: BBox): string {
-  if (!shape) {
-    return '';
-  }
-  let i = 0;
-  let d = '';
-
-  shape.lengths.forEach(len => {
-    for (let j = 0; j < len; j++) {
-      const vidx = shape.vertices[i];
-      const x = vertices[vidx * 2];
-      const y = -vertices[vidx * 2 + 1];
-      d += i !== 0 ? 'L ' : 'M ';
-      d += `${roundToTwo(x)} ${roundToTwo(y)} `;
-      bbox.addToBox(x, y);
-      i++;
-    }
-  });
-  return d;
+  id: string,
+  size: string,
+  style: ContourLayerStyle
+): string {
+  const d = contourToPath(contour, snapshot.vertices, bbox);
+  const dash = style.dashArray ? ` stroke-dasharray="${style.dashArray}"` : '';
+  return `<path id="${id}" class="size${size}" d="${d}" fill="none" stroke="${style.stroke}"${dash} vector-effect="non-scaling-stroke"/>`;
 }
 
 function generatePieceSVG(
   piece: IPatternPiece,
   sizes: string[],
-  baseSize: number,
-  unit: number,
+  baseSize: string,
+  unit: string,
   bbox: BBox,
-  rainbow: (size: number) => string,
+  colorForSize: (size: string) => string,
   options: Required<SVGOptions>
 ): string {
   const layers: Record<string, { svg: string[]; name: string }> = {
     annotations: { svg: [], name: 'annotations' },
-    bounderies: { svg: [], name: 'bounderies' },
-    internalShapes: { svg: [], name: 'internal' },
-    turnPoints: { svg: [], name: 'turn points' },
-    curvePoints: { svg: [], name: 'curve points' },
-    grainLines: { svg: [], name: 'grainLines' },
-    notches: { svg: [], name: 'notches' },
-    gradeReferences: { svg: [], name: 'gradeReference' },
-    mirrorLines: { svg: [], name: 'mirrorLines' },
-    drillHoles: { svg: [], name: 'drillHoles' },
+    boundaries: { svg: [], name: 'boundaries' },
   };
+  [...CONTOUR_LAYERS, ...SINGLE_CONTOUR_LAYERS].forEach(({ key, name }) => {
+    layers[key] = { svg: [], name };
+  });
+  layers.notches = { svg: [], name: 'notches' };
+  POINT_LAYERS.forEach(({ key, name }) => {
+    layers[key] = { svg: [], name };
+  });
 
-  sizes.forEach(key => {
-    const size = +key;
+  for (const size of sizes) {
+    const snapshot = piece.sizes[size];
+    if (!snapshot) {
+      continue;
+    }
     const isBaseSize = size === baseSize;
-    const id = piece.name + '-' + size;
+    const id = `${piece.name}-${size}`;
 
-    // Access shapes with string key, cast to IShape
-    const shapeData = (piece.shapes as Record<string, IShape>)[key];
-    const d = generatePathFromShape(shapeData, piece.vertices, bbox);
-    if (d) {
-      const color = rainbow(size);
-      const fill = isBaseSize ? options.baseSizeFill : 'none';
-      const sizePath = `<path id="path-${id}" class="size${size}" d="${d}" fill="${fill}" stroke="${color}" vector-effect="non-scaling-stroke"/>`;
+    const d = contourToPath(snapshot.boundary, snapshot.vertices, bbox);
+    const fill = isBaseSize ? options.baseSizeFill : 'none';
+    const boundaryPath = `<path id="path-${id}" class="size${size}" d="${d}" fill="${fill}" stroke="${colorForSize(size)}" vector-effect="non-scaling-stroke"/>`;
+    if (isBaseSize) {
+      layers.boundaries.svg.unshift(boundaryPath);
+    } else {
+      layers.boundaries.svg.push(boundaryPath);
+    }
 
-      if (isBaseSize) {
-        layers.bounderies.svg.unshift(sizePath);
-      } else {
-        layers.bounderies.svg.push(sizePath);
+    for (const { key, idPrefix, style } of CONTOUR_LAYERS) {
+      snapshot[key].forEach((contour, index) => {
+        layers[key].svg.push(contourPathElement(contour, snapshot, bbox, `${idPrefix}-${id}-${index}`, size, style));
+      });
+    }
+
+    for (const { key, idPrefix, style } of SINGLE_CONTOUR_LAYERS) {
+      const contour = snapshot[key];
+      if (contour) {
+        layers[key].svg.push(contourPathElement(contour, snapshot, bbox, `${idPrefix}-${id}`, size, style));
       }
     }
 
-    const internalData = (piece.internalShapes as Record<string, IShape>)[key];
-    const di = generateSegmentsFromShape(internalData, piece.vertices, bbox);
-    layers.internalShapes.svg = layers.internalShapes.svg.concat(
-      di.map((dStr, idx) => `<path id="internal-${id}-${idx}" class="size${size} internal" d="${dStr}" fill="none" stroke="blue" vector-effect="non-scaling-stroke"/>`)
+    layers.notches.svg.push(
+      ...circles(snapshot.notches.map(notch => notch.vertex), snapshot.vertices, bbox, size, unit, 'red')
     );
+    for (const { key, fill: pointFill } of POINT_LAYERS) {
+      layers[key].svg.push(...circles(snapshot[key], snapshot.vertices, bbox, size, unit, pointFill));
+    }
 
-    const turnData = (piece.turnPoints as Record<string, IShape>)[key];
-    const tp = generatePointsFromShape(turnData, piece.vertices, bbox, size, unit);
-    layers.turnPoints.svg = layers.turnPoints.svg.concat(tp);
-
-    const drillData = (piece.drillHoles as Record<string, IShape>)[key];
-    const dh = generatePointsFromShape(drillData, piece.vertices, bbox, size, unit);
-    layers.drillHoles.svg = layers.drillHoles.svg.concat(dh);
-
-    const curveData = (piece.curvePoints as Record<string, IShape>)[key];
-    const cp = generatePointsFromShape(curveData, piece.vertices, bbox, size, unit);
-    layers.curvePoints.svg = layers.curvePoints.svg.concat(cp);
-
-    const notchData = (piece.notches as Record<string, IShape>)[key];
-    const no = generatePointsFromShape(notchData, piece.vertices, bbox, size, unit);
-    layers.notches.svg = layers.notches.svg.concat(no);
-
-    const grainData = (piece.grainLines as Record<string, IShape>)[key];
-    const gl = generateSegmentsFromShape(grainData, piece.vertices, bbox);
-    layers.grainLines.svg = layers.grainLines.svg.concat(
-      gl.map((dStr, idx) => `<path id="grainline-${id}-${idx}" class="size${size}" d="${dStr}" fill="none" stroke="black" vector-effect="non-scaling-stroke" />`)
-    );
-
-    const mirrorData = (piece.mirrorLines as Record<string, IShape>)[key];
-    const ml = generateSegmentsFromShape(mirrorData, piece.vertices, bbox);
-    layers.mirrorLines.svg = layers.mirrorLines.svg.concat(
-      ml.map((dStr, idx) => `<path id="mirror-${id}-${idx}" class="size${size}" d="${dStr}" fill="none" stroke="black" vector-effect="non-scaling-stroke" />`)
-    );
-
-    const gradeData = (piece.gradeReferences as Record<string, IShape>)[key];
-    const grl = generateSegmentsFromShape(gradeData, piece.vertices, bbox);
-    layers.gradeReferences.svg = layers.gradeReferences.svg.concat(
-      grl.map((dStr, idx) => `<path id="grade-${id}-${idx}" class="size${size}" d="${dStr}" fill="none" stroke="green" vector-effect="non-scaling-stroke" />`)
-    );
-
-    const annotationData = (piece.annotations as Record<string, ITextAnnotation | null>)[key];
-    const annotation = generateText(annotationData);
-    layers.annotations.svg = layers.annotations.svg.concat(annotation);
-  });
+    layers.annotations.svg.push(...texts(snapshot.annotations, size));
+  }
 
   let result = '';
   Object.keys(layers).forEach(layerName => {
     const layer = layers[layerName];
     if (layer.svg.length) {
       if (options.inkscapeLayers) {
-        result += `<g inkscape:label="${piece.name} ${layer.name}" inkscape:groupmode="layer">`;
+        result += `<g inkscape:label="${escapeXML(piece.name)} ${layer.name}" inkscape:groupmode="layer">`;
       } else {
         result += `<g data-layer="${layer.name}">`;
       }
@@ -260,22 +241,28 @@ function generatePieceSVG(
 export function generateSVG(data: IOpenPatternFormat, options: SVGOptions = {}): string {
   const opts: Required<SVGOptions> = { ...DEFAULT_OPTIONS, ...options };
   const sizes = opts.sizes.length > 0 ? opts.sizes : data.sizes;
-  const baseSize = +data.style.baseSize;
+  const baseSize = data.style.baseSize;
   const unit = data.asset.unit;
 
-  const rainbow = d3.scaleSequential(d3.interpolateWarm).domain([+sizes[0], +sizes[sizes.length - 1]]);
+  // Color by size index so non-numeric sizes (S, M, L) work as well
+  const rainbow = d3.scaleSequential(d3.interpolateWarm).domain([0, Math.max(sizes.length - 1, 1)]);
+  const sizeIndex = new Map(sizes.map((size, i) => [size, i]));
+  const colorForSize = (size: string) => rainbow(sizeIndex.get(size) ?? 0);
+
   const bbox = new BBox();
 
   let layerStr = '';
   let layerCount = 0;
 
   data.pieces.forEach(piece => {
-    const pieceContent = generatePieceSVG(piece, sizes, baseSize, unit, bbox, rainbow, opts);
-
+    const pieceContent = generatePieceSVG(piece, sizes, baseSize, unit, bbox, colorForSize, opts);
+    if (!pieceContent) {
+      return;
+    }
     if (opts.inkscapeLayers) {
-      layerStr += `<g id="layer${layerCount++}" inkscape:label="${piece.name}" inkscape:groupmode="layer">`;
+      layerStr += `<g id="layer${layerCount++}" inkscape:label="${escapeXML(piece.name)}" inkscape:groupmode="layer">`;
     } else {
-      layerStr += `<g id="piece-${piece.name}">`;
+      layerStr += `<g id="piece-${escapeXML(piece.name)}">`;
     }
     layerStr += pieceContent;
     layerStr += '</g>';

@@ -1,15 +1,26 @@
 import DxfParser, { IDxf, IEntity, ITextEntity } from 'dxf-parser';
 import * as fs from 'fs';
 import { Diagnostic, Severity } from './lib/Diagnostic.js';
-import { BlockEntity, PatternPiece } from './lib/PatternPiece.js';
+import { BlockEntity, buildSnapshot } from './lib/snapshot.js';
 import { IPatternPiece } from './lib/interfaces.js';
 
-export type { IPatternPiece, IShape } from './lib/interfaces.js';
+export type {
+  ContourSegment,
+  IContour,
+  INotch,
+  IPatternPiece,
+  IQualityValidation,
+  ISizeSnapshot,
+  NotchType,
+  TextAnnotation,
+} from './lib/interfaces.js';
+export { ASTMLayers } from './lib/interfaces.js';
 
-export const enum Units {
-  MM = 1,
-  INCH = 2
-}
+/** Version of the Open Pattern Format emitted by this parser. */
+export const OPF_VERSION = '0.3.0';
+
+/** Measurement unit of all coordinates in the document. */
+export type Unit = 'mm' | 'inch';
 
 export type { Diagnostic, Severity } from './lib/Diagnostic.js';
 
@@ -19,7 +30,7 @@ export interface IAsset {
   authoringVendor: string;
   creationDate: string;
   creationTime: string;
-  unit: Units;
+  unit: Unit;
 }
 
 export interface IStyle {
@@ -28,6 +39,8 @@ export interface IStyle {
 }
 
 export interface IOpenPatternFormat {
+  /** Semantic version of the Open Pattern Format */
+  version: string;
   asset: IAsset;
   pieces: IPatternPiece[];
   sizes: string[];
@@ -39,38 +52,76 @@ export interface IReturnValue {
   diagnostics: Diagnostic[];
 }
 
+/** Sort sizes numerically when possible, alphabetically otherwise. */
+export function compareSizes(a: string, b: string): number {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) {
+    return na - nb;
+  }
+  return a.localeCompare(b);
+}
+
 class ASTMParser {
   diagnostics: Diagnostic[] = [];
 
-  async parseStream(stream: fs.ReadStream): Promise<IReturnValue> {
+  /** Parse DXF content provided as a string. */
+  async parseString(content: string): Promise<IReturnValue> {
     // @ts-expect-error - ESM/CJS interop issue with dxf-parser default export
     const parser: DxfParser = new DxfParser();
-    const dxf: IDxf = await parser.parseStream(stream);
-    
-    const pieceMap = new Map<string, PatternPiece>();
+    const dxf = parser.parse(content);
+    if (!dxf) {
+      throw new Error('Failed to parse DXF content');
+    }
+    return this._transform(dxf);
+  }
+
+  /** Parse a DXF file from disk. */
+  async parseFile(filePath: string): Promise<IReturnValue> {
+    const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
+    return this.parseStream(stream);
+  }
+
+  async parseStream(stream: NodeJS.ReadableStream): Promise<IReturnValue> {
+    // @ts-expect-error - ESM/CJS interop issue with dxf-parser default export
+    const parser: DxfParser = new DxfParser();
+    const dxf: IDxf = await parser.parseStream(stream as fs.ReadStream);
+    return this._transform(dxf);
+  }
+
+  private _transform(dxf: IDxf): IReturnValue {
+    this.diagnostics = [];
+    const pieceMap = new Map<string, IPatternPiece>();
     const sizeSet = new Set<string>();
-    let foundError = false;
 
     Object.keys(dxf.blocks).forEach(key => {
       const block = dxf.blocks[key];
+      const name = this._findKey(block.entities, 'piece name');
+      if (name === '') {
+        this.diagnostics.push(new Diagnostic(Severity.WARNING, `Skipping block '${key}': missing required field piece name`, block));
+        return;
+      }
+
       const size = this._findKey(block.entities, 'size');
-      if (size !== null) {
+      if (size !== '') {
         sizeSet.add(size);
       }
 
-      const name = this._findKey(block.entities, 'piece name');
-      if (name === null) {
-        this.diagnostics.push(new Diagnostic(Severity.ERROR, 'Missing required field piece name', block));
-        foundError = true;
+      const snapshot = buildSnapshot(block.entities as BlockEntity[], this.diagnostics);
+      if (!snapshot) {
+        this.diagnostics.push(new Diagnostic(Severity.WARNING, `Skipping block '${key}' (piece '${name}', size '${size}')`));
         return;
       }
-      let actualPiece = pieceMap.get(name);
-      if (!actualPiece) {
-        actualPiece = new PatternPiece(name);
-        pieceMap.set(name, actualPiece);
+
+      let piece = pieceMap.get(name);
+      if (!piece) {
+        piece = { name, sizes: {} };
+        pieceMap.set(name, piece);
       }
-      const diag = actualPiece.createSize(size, block.entities as BlockEntity[]);
-      this.diagnostics.push(...diag);
+      if (piece.sizes[size]) {
+        this.diagnostics.push(new Diagnostic(Severity.WARNING, `Duplicate block for piece '${name}', size '${size}'; overwriting`));
+      }
+      piece.sizes[size] = snapshot;
     });
 
     const baseSizeStr = this._findKey(dxf.entities, 'sample size');
@@ -90,31 +141,28 @@ class ASTMParser {
       unit: this._findUnit(dxf.entities)
     };
 
-    if (foundError) {
-      throw new Error(this.diagnostics.map(diag => diag.message).join('\n'));
-    }
-
     return {
       data: {
+        version: OPF_VERSION,
         asset,
         pieces: Array.from(pieceMap.values()),
-        sizes: Array.from(sizeSet).sort(),
+        sizes: Array.from(sizeSet).sort(compareSizes),
         style
       },
       diagnostics: this.diagnostics
     };
   }
 
-  private _findUnit(entities: IEntity[]): Units {
+  private _findUnit(entities: IEntity[]): Unit {
     const unitStr = this._findKey(entities, 'units');
     if (unitStr === 'METRIC') {
-      return Units.MM;
+      return 'mm';
     }
     if (unitStr === 'ENGLISH') {
-      return Units.INCH;
+      return 'inch';
     }
     this.diagnostics.push(new Diagnostic(Severity.WARNING, `Unexpected unit: '${unitStr}'`));
-    return Units.INCH;
+    return 'inch';
   }
 
   private _findKey(entities: IEntity[], key: string): string {
@@ -126,7 +174,6 @@ class ASTMParser {
           this.diagnostics.push(new Diagnostic(Severity.WARNING, 'Unexpected syntax in key-value text string: ' + textEntity.text, entity));
           continue;
         }
-        // console.log(result)
         if (result.key.toLowerCase() === key) {
           return result.value;
         }

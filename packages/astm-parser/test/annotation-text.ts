@@ -1,5 +1,4 @@
 import { describe, it, beforeAll, expect } from 'vitest';
-import * as fs from 'fs';
 import * as path from 'path';
 
 import { ASTMParser, Diagnostic, IOpenPatternFormat } from '../src/index.js';
@@ -10,46 +9,37 @@ describe('ASTM with annotation text', () => {
 
   beforeAll(async () => {
     const DXF_FILE_PATH = path.join(__dirname, 'data', 'dxf', 'annotation.DXF');
-    const fileStream = fs.createReadStream(DXF_FILE_PATH, { encoding: 'utf8' });
-
     const parser = new ASTMParser();
-    const res = await parser.parseStream(fileStream);
+    const res = await parser.parseFile(DXF_FILE_PATH);
     expect(res).toBeTypeOf('object');
     result = res.data;
     diagnostics = res.diagnostics;
   });
 
-  it('should have no diagnostics', () => {
-    expect(diagnostics).toHaveLength(1989); // ASTM
+  it('should have only the known key-value syntax diagnostic', () => {
+    // One TEXT entity 'ANNOTATION' without key:value syntax
+    expect(diagnostics).toHaveLength(1);
   });
 
   it('should have asset information', () => {
-    expect(result).toHaveProperty('asset');
-    expect(result.asset).toBeTypeOf('object');
     expect(result.asset).toHaveProperty('authoringVendor', 'GERBER TECHNOLOGY ; ACCUMARK ; 10.0.1');
     expect(result.asset).toHaveProperty('authoringTool', '');
     expect(result.asset).toHaveProperty('authoringToolVersion', '');
     expect(result.asset).toHaveProperty('creationDate', '23-10-2017');
     expect(result.asset).toHaveProperty('creationTime', '10:31');
-    expect(result.asset).toHaveProperty('unit', 1);
+    expect(result.asset).toHaveProperty('unit', 'mm');
   });
 
   it('should have style information', () => {
-    expect(result).toHaveProperty('style');
-    expect(result.style).toBeTypeOf('object');
     expect(result.style).toHaveProperty('baseSize', '50');
     expect(result.style).toHaveProperty('name', 'GMG1016S19');
   });
 
-  it('should have annotations information', () => {
+  it('should have annotation text on the snapshot', () => {
     const piece = result.pieces[0];
-    expect(piece).toHaveProperty('annotations');
-    expect(piece.annotations).toBeTypeOf('object');
-    expect(Object.keys(piece.annotations)).toEqual(expect.arrayContaining(result.sizes));
-
-    const annotation = piece.annotations[52];
-    console.log(annotation);
-    expect(annotation).toBeTypeOf('object');
-    expect(annotation!.text).toBe('Neckline Full Collar W/stand');
+    const annotations = piece.sizes['52'].annotations.filter(a => a.source === undefined);
+    expect(annotations).toHaveLength(1);
+    expect(annotations[0].text).toBe('Neckline Full Collar W/stand');
+    expect(annotations[0].position).toBeDefined();
   });
 });

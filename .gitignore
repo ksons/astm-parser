@@ -7,3 +7,6 @@ CLAUDE.md
 .claude/
 
 test/data/*
+# Local CLI output artifacts
+/test.json
+/test.svg

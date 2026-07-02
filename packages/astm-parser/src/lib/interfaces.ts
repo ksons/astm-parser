@@ -1,49 +1,131 @@
-export const enum ASTMLayers {
-  Boundery = 1,
+/**
+ * ASTM D6673 / AAMA-292 DXF layer assignments.
+ *
+ * Layers 1-15 carry the pattern geometry, layers 80-83 carry special
+ * notch types and layers 84-87 carry quality-validation copies of the
+ * cut geometry (boundary, internal lines, cutouts and sew lines).
+ */
+export enum ASTMLayers {
+  Boundary = 1,
   TurnPoints = 2,
   CurvePoints = 3,
+  /** V-notches and slit notches */
   Notches = 4,
   GradeReference = 5,
   MirrorLine = 6,
   GrainLine = 7,
+  /** Drawn on the piece, not cut */
   InternalLines = 8,
+  StripeReference = 9,
+  PlaidReference = 10,
+  /** Cut lines inside the piece boundary */
+  InternalCutouts = 11,
   DrillHoles = 13,
+  SewLines = 14,
   AnnotationText = 15,
-  ASTMBoundery = 84,
-  ASTMInternalLines = 85
+  TNotch = 80,
+  CastleNotch = 81,
+  CheckNotch = 82,
+  UNotch = 83,
+  BoundaryQualityValidation = 84,
+  InternalLinesQualityValidation = 85,
+  InternalCutoutsQualityValidation = 86,
+  SewLinesQualityValidation = 87
 }
 
+/** Notch types defined by ASTM D6673 (layers 4 and 80-83). */
+export type NotchType = 'v-slit' | 't' | 'castle' | 'check' | 'u';
+
+/**
+ * One segment of a contour. All numbers are indices into the
+ * snapshot's vertex pool.
+ *
+ * - `lines`: a run of straight segments through the listed vertices.
+ * - `cubic`: a cubic Bezier (SVG `C` semantics) with control points
+ *   `c1`/`c2` ending on `to`.
+ */
+export type ContourSegment =
+  | { type: 'lines'; to: number[] }
+  | { type: 'cubic'; c1: number; c2: number; to: number };
+
+/**
+ * A contour starts at vertex `start` and follows `segments`. When
+ * `closed` is true, an implicit straight edge connects the last
+ * on-curve point back to `start` (SVG `Z` semantics).
+ */
+export interface IContour {
+  start: number;
+  closed: boolean;
+  segments: ContourSegment[];
+}
+
+export interface INotch {
+  /** Index into the snapshot vertex pool */
+  vertex: number;
+  type: NotchType;
+}
+
+/**
+ * Free text belonging to a snapshot. `source` names the OPF property
+ * whose ASTM source layer the text was found on (e.g. 'boundary');
+ * omitted for regular annotation text (ASTM layer 15).
+ */
 export interface TextAnnotation {
   text: string;
   position?: { x: number; y: number };
   height?: number;
   rotation?: number;
+  source?: string;
 }
 
-
-export interface IMetadata {
-  textAnnotations?: TextAnnotation[];
+/**
+ * Quality-validation copies of cut geometry (ASTM layers 84-87),
+ * written by some CAD systems so receivers can validate their import.
+ * Present only when the source file carries them.
+ */
+export interface IQualityValidation {
+  boundary?: IContour[];
+  internalLines?: IContour[];
+  internalCutouts?: IContour[];
+  sewLines?: IContour[];
 }
 
-export interface IShape {
-  lengths: number[];
+/**
+ * The complete geometry of one pattern piece in one size. Snapshots
+ * are self-contained: all indices reference the snapshot's own
+ * `vertices` pool ([x0, y0, x1, y1, ...], deduplicated).
+ */
+export interface ISizeSnapshot {
+  /** Flat coordinate pool: [x0, y0, x1, y1, ...] */
   vertices: number[];
-  metadata?: IMetadata;
+  /** The piece outline (cut line), always closed */
+  boundary: IContour;
+  internalLines: IContour[];
+  internalCutouts: IContour[];
+  sewLines: IContour[];
+  stripeReferences: IContour[];
+  plaidReferences: IContour[];
+  gradeReferences: IContour[];
+  grainLine?: IContour;
+  mirrorLine?: IContour;
+  /** Vertex indices marking direction changes on the boundary */
+  turnPoints: number[];
+  /** Vertex indices of curve fit points */
+  curvePoints: number[];
+  /** Vertex indices of drill/punch positions */
+  drillHoles: number[];
+  notches: INotch[];
+  annotations: TextAnnotation[];
+  qualityValidation?: IQualityValidation;
 }
 
-
-
+/**
+ * A pattern piece with one snapshot per size it exists in. The keys
+ * of `sizes` are size identifiers; a piece need not exist in every
+ * size of the style (sparse size runs), but must include the style's
+ * base size.
+ */
 export interface IPatternPiece {
   name: string;
-  shapes: Record<string, IShape>;
-  internalShapes: Record<string, IShape>;
-  turnPoints: Record<string, IShape>;
-  curvePoints: Record<string, IShape>;
-  grainLines: Record<string, IShape>;
-  notches: Record<string, IShape>;
-  gradeReferences: Record<string, IShape>;
-  mirrorLines: Record<string, IShape>;
-  drillHoles: Record<string, IShape>;
-  annotations: Record<string, object | null>;
-  vertices: number[];
+  sizes: Record<string, ISizeSnapshot>;
 }

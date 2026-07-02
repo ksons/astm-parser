@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://open-patterns.org/schema/opf-0.3.0.json",
+  "title": "Open Pattern Format",
+  "description": "JSON-based interchange format for 2D apparel patterns (see docs/opf-spec.md)",
+  "type": "object",
+  "required": ["version", "asset", "style", "sizes", "pieces"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "asset": { "$ref": "#/$defs/asset" },
+    "style": { "$ref": "#/$defs/style" },
+    "sizes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "pieces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/piece" }
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "required": ["authoringTool", "authoringToolVersion", "authoringVendor", "creationDate", "creationTime", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "authoringTool": { "type": "string" },
+        "authoringToolVersion": { "type": "string" },
+        "authoringVendor": { "type": "string" },
+        "creationDate": { "type": "string" },
+        "creationTime": { "type": "string" },
+        "unit": { "enum": ["mm", "inch"] }
+      }
+    },
+    "style": {
+      "type": "object",
+      "required": ["name", "baseSize"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "baseSize": { "type": "string" }
+      }
+    },
+    "vertexIndex": { "type": "integer", "minimum": 0 },
+    "position": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "contourSegment": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "to"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "lines" },
+            "to": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/vertexIndex" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "c1", "c2", "to"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "cubic" },
+            "c1": { "$ref": "#/$defs/vertexIndex" },
+            "c2": { "$ref": "#/$defs/vertexIndex" },
+            "to": { "$ref": "#/$defs/vertexIndex" }
+          }
+        }
+      ]
+    },
+    "contour": {
+      "type": "object",
+      "required": ["start", "closed", "segments"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "$ref": "#/$defs/vertexIndex" },
+        "closed": { "type": "boolean" },
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contourSegment" }
+        }
+      }
+    },
+    "contours": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/contour" }
+    },
+    "vertexIndices": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/vertexIndex" }
+    },
+    "notch": {
+      "type": "object",
+      "required": ["vertex", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "vertex": { "$ref": "#/$defs/vertexIndex" },
+        "type": { "enum": ["v-slit", "t", "castle", "check", "u"] }
+      }
+    },
+    "textAnnotation": {
+      "type": "object",
+      "required": ["text"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string" },
+        "position": { "$ref": "#/$defs/position" },
+        "height": { "type": "number" },
+        "rotation": { "type": "number" },
+        "source": { "type": "string" }
+      }
+    },
+    "qualityValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "boundary": { "$ref": "#/$defs/contours" },
+        "internalLines": { "$ref": "#/$defs/contours" },
+        "internalCutouts": { "$ref": "#/$defs/contours" },
+        "sewLines": { "$ref": "#/$defs/contours" }
+      }
+    },
+    "sizeSnapshot": {
+      "type": "object",
+      "required": [
+        "vertices",
+        "boundary",
+        "internalLines",
+        "internalCutouts",
+        "sewLines",
+        "stripeReferences",
+        "plaidReferences",
+        "gradeReferences",
+        "turnPoints",
+        "curvePoints",
+        "drillHoles",
+        "notches",
+        "annotations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "vertices": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "boundary": { "$ref": "#/$defs/contour" },
+        "internalLines": { "$ref": "#/$defs/contours" },
+        "internalCutouts": { "$ref": "#/$defs/contours" },
+        "sewLines": { "$ref": "#/$defs/contours" },
+        "stripeReferences": { "$ref": "#/$defs/contours" },
+        "plaidReferences": { "$ref": "#/$defs/contours" },
+        "gradeReferences": { "$ref": "#/$defs/contours" },
+        "grainLine": { "$ref": "#/$defs/contour" },
+        "mirrorLine": { "$ref": "#/$defs/contour" },
+        "turnPoints": { "$ref": "#/$defs/vertexIndices" },
+        "curvePoints": { "$ref": "#/$defs/vertexIndices" },
+        "drillHoles": { "$ref": "#/$defs/vertexIndices" },
+        "notches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/notch" }
+        },
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/textAnnotation" }
+        },
+        "qualityValidation": { "$ref": "#/$defs/qualityValidation" }
+      }
+    },
+    "piece": {
+      "type": "object",
+      "required": ["name", "sizes"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "sizes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/sizeSnapshot" }
+        }
+      }
+    }
+  }
+}

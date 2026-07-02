@@ -1,8 +1,8 @@
 import { describe, it, beforeAll, expect } from 'vitest';
-import * as fs from 'fs';
 import * as path from 'path';
 
 import { ASTMParser, Diagnostic, IOpenPatternFormat } from '../src/index.js';
+import { contourPointCount } from './helpers.js';
 
 describe('CLO file', () => {
   let result: IOpenPatternFormat;
@@ -10,113 +10,78 @@ describe('CLO file', () => {
 
   beforeAll(async () => {
     const DXF_FILE_PATH = path.join(__dirname, 'data', 'dxf', 'clo-pattern.dxf');
-    const fileStream = fs.createReadStream(DXF_FILE_PATH, { encoding: 'utf8' });
-
     const parser = new ASTMParser();
-    const res = await parser.parseStream(fileStream);
+    const res = await parser.parseFile(DXF_FILE_PATH);
     expect(res).toBeTypeOf('object');
     result = res.data;
     diagnostics = res.diagnostics;
   });
 
   it('should have no diagnostics', () => {
-    expect(diagnostics).toHaveLength(9);
+    expect(diagnostics).toHaveLength(0);
   });
 
-  it('should have no asset information', () => {
-    expect(result).toHaveProperty('asset');
+  it('should have asset information', () => {
     expect(result.asset).toBeTypeOf('object');
     expect(result.asset).toHaveProperty('authoringVendor', 'CLO Virtual Fashion Inc.');
     expect(result.asset).toHaveProperty('authoringTool', 'CLO Standalone OnlineAuth 4.0.129');
     expect(result.asset).toHaveProperty('authoringToolVersion', '3');
     expect(result.asset).toHaveProperty('creationDate', '05-03-2018');
     expect(result.asset).toHaveProperty('creationTime', '08:29');
-    expect(result.asset).toHaveProperty('unit', 1);
+    expect(result.asset).toHaveProperty('unit', 'mm');
   });
 
   it('should have style information', () => {
-    expect(result).toHaveProperty('style');
-    expect(result.style).toBeTypeOf('object');
     expect(result.style).toHaveProperty('baseSize', 'M');
     expect(result.style).toHaveProperty('name', 'clo-pattern');
   });
 
   it('should contain pieces', () => {
-    // Pieces
-    expect(result).toHaveProperty('pieces');
-    expect(Array.isArray(result.pieces)).toBe(true);
     expect(result.pieces).toHaveLength(9);
     const pieceNames = ['11', '36', '37', '38', '39', '7', 'Pattern2D_768516', 'Pattern2D_768527', 'Pattern2D_768528'];
     expect(result.pieces.map(a => a.name).sort()).toEqual(pieceNames);
   });
 
   it('should contain sizes', () => {
-    // Sizes
-    expect(result).toHaveProperty('sizes');
-    expect(Array.isArray(result.sizes)).toBe(true);
-    expect(result.sizes).toHaveLength(1);
     expect(result.sizes).toEqual(['M']);
   });
 
-  it('should contain vertices', () => {
-    const piece = result.pieces[0];
-    expect(piece).toHaveProperty('vertices');
-    expect(Array.isArray(piece.vertices)).toBe(true);
-    expect(piece.vertices.length).toBe(182 * 2);
+  it('should contain a closed boundary contour', () => {
+    const piece = result.pieces.find(p => p.name === '11')!;
+    const snapshot = piece.sizes['M'];
+    expect(snapshot.vertices.length).toBe(182 * 2);
+    expect(snapshot.boundary.closed).toBe(true);
+    expect(contourPointCount(snapshot.boundary)).toBe(148);
   });
 
-  it('should contain shapes', () => {
-    // Shapes
-    const piece = result.pieces[0];
-    expect(piece).toHaveProperty('shapes');
-    expect(piece.shapes).toBeTypeOf('object');
-    expect(Object.keys(piece.shapes)).toEqual(expect.arrayContaining(result.sizes));
-
-
-    const shape = piece.shapes.M;
-    expect(shape).toBeTypeOf('object');
-
-    expect(shape.vertices.length).toBe(148);
-    expect(shape.vertices.length).toBe(shape.lengths.reduce((acc, prev) => acc + prev));
-
-    // Shape metadata
-    expect(shape).toHaveProperty('metadata');
-    expect(shape.metadata).toBeTypeOf('object');
-    expect(shape.metadata).toHaveProperty('textAnnotations');
-    expect(Array.isArray(shape.metadata?.textAnnotations)).toBe(true);
-    expect(shape.metadata?.textAnnotations).toHaveLength(4);
-    const annotations = shape.metadata!.textAnnotations!;
-    expect(annotations[0]).toEqual({
-      text: 'PIECE NAME: 11',
-      position: { x: 192.148163, y: 1244.616211 },
-      height: undefined,
-      rotation: 0
-    });
+  it('keeps boundary text as sourced annotations, lifted keys excluded', () => {
+    const piece = result.pieces.find(p => p.name === '11')!;
+    const boundaryTexts = piece.sizes['M'].annotations.filter(a => a.source === 'boundary');
+    expect(boundaryTexts).toHaveLength(2);
+    expect(boundaryTexts.map(a => a.text)).toEqual(['ANNOTATION:', 'QUANTITY: 1']);
+    expect(boundaryTexts[0].position).toEqual({ x: 192.148163, y: 1234.616211 });
+    // 'PIECE NAME: 11' and 'SIZE: M' are lifted into the structure
+    const texts = piece.sizes['M'].annotations.map(a => a.text.toLowerCase());
+    expect(texts.some(t => t.startsWith('piece name'))).toBe(false);
+    expect(texts.some(t => t.startsWith('size:'))).toBe(false);
   });
 
-  it('should contain internal shapes', () => {
-    // Shapes
-    const piece = result.pieces.find(p => p.name === '11');
-    expect(piece).toHaveProperty('internalShapes');
-    expect(piece!.internalShapes).toBeTypeOf('object');
-    expect(Object.keys(piece!.internalShapes)).toEqual(expect.arrayContaining(result.sizes));
-
-    const shape = piece!.internalShapes.M;
-    expect(shape).toBeTypeOf('object');
-    expect(shape.vertices.length).toBe(22);
-    expect(shape.vertices.length).toBe(shape.lengths.reduce((acc, prev) => acc + prev));
+  it('should contain internal lines', () => {
+    const piece = result.pieces.find(p => p.name === '11')!;
+    expect(piece.sizes['M'].internalLines).toHaveLength(6);
   });
 
-  it('should contain grain lines', () => {
-    // Shapes
-    const piece = result.pieces.find(p => p.name === '11');
-    expect(piece).toBeDefined();
-    expect(piece).toHaveProperty('grainLines');
-    expect(piece!.grainLines).toBeTypeOf('object');
-    expect(Object.keys(piece!.grainLines)).toEqual(expect.arrayContaining(result.sizes));
+  it('should contain a grain line', () => {
+    const piece = result.pieces.find(p => p.name === '11')!;
+    const grainLine = piece.sizes['M'].grainLine!;
+    expect(grainLine).toBeDefined();
+    expect(contourPointCount(grainLine)).toBe(2);
+  });
 
-    const shape = piece!.grainLines.M;
-    expect(shape.vertices.length).toBe(2);
-    expect(shape.vertices.length).toBe(shape.lengths.reduce((acc, prev) => acc + prev));
+  it('preserves the CLO quality-validation boundary (layer 84)', () => {
+    const piece = result.pieces.find(p => p.name === '11')!;
+    const qv = piece.sizes['M'].qualityValidation!;
+    expect(qv).toBeDefined();
+    expect(qv.boundary!.length).toBeGreaterThan(0);
   });
 });
