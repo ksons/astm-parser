@@ -1,7 +1,7 @@
 import { describe, it, beforeAll, expect } from 'vitest';
 import * as path from 'path';
 
-import { ASTMParser, Diagnostic, IOpenPatternFormat } from '../src/index.js';
+import { ASTMParser, Diagnostic, IOpenPatternFormat, OPF_VERSION } from '../src/index.js';
 import { contourPointCount } from './helpers.js';
 
 describe('ASTM file', () => {
@@ -22,7 +22,7 @@ describe('ASTM file', () => {
   });
 
   it('should have version and asset information', () => {
-    expect(result.version).toBe('0.3.0');
+    expect(result.version).toBe(OPF_VERSION);
     expect(result.asset).toBeTypeOf('object');
     expect(result.asset).toHaveProperty('authoringVendor', 'GERBER TECHNOLOGY');
     expect(result.asset).toHaveProperty('authoringTool', 'ACCUMARK');

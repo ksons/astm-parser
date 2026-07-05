@@ -2,22 +2,28 @@ import DxfParser, { IDxf, IEntity, ITextEntity } from 'dxf-parser';
 import * as fs from 'fs';
 import { Diagnostic, Severity } from './lib/Diagnostic.js';
 import { BlockEntity, buildSnapshot } from './lib/snapshot.js';
-import { IPatternPiece } from './lib/interfaces.js';
+import { IPatternPiece, ISeam, ITopstitch, ITopstitchStyle } from './lib/interfaces.js';
 
 export type {
   ContourSegment,
   IContour,
+  IContourRef,
   INotch,
   IPatternPiece,
   IQualityValidation,
+  ISeam,
+  ISeamSide,
   ISizeSnapshot,
+  ITopstitch,
+  ITopstitchStyle,
+  ITopstitchTarget,
   NotchType,
   TextAnnotation,
 } from './lib/interfaces.js';
 export { ASTMLayers } from './lib/interfaces.js';
 
 /** Version of the Open Pattern Format emitted by this parser. */
-export const OPF_VERSION = '0.3.0';
+export const OPF_VERSION = '0.4.0';
 
 /** Measurement unit of all coordinates in the document. */
 export type Unit = 'mm' | 'inch';
@@ -45,6 +51,12 @@ export interface IOpenPatternFormat {
   pieces: IPatternPiece[];
   sizes: string[];
   style: IStyle;
+  /** Assembly seams (which contour ranges are sewn together) */
+  sewing?: ISeam[];
+  /** Decorative stitch lines */
+  topstitching?: ITopstitch[];
+  /** Reusable topstitch style definitions referenced by `topstitching` */
+  topstitchStyles?: ITopstitchStyle[];
 }
 
 export interface IReturnValue {

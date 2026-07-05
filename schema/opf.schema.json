@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://open-patterns.org/schema/opf-0.3.0.json",
+  "$id": "https://open-patterns.org/schema/opf-0.4.0.json",
   "title": "Open Pattern Format",
   "description": "JSON-based interchange format for 2D apparel patterns (see docs/opf-spec.md)",
   "type": "object",
@@ -21,6 +21,18 @@
     "pieces": {
       "type": "array",
       "items": { "$ref": "#/$defs/piece" }
+    },
+    "sewing": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/seam" }
+    },
+    "topstitching": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/topstitch" }
+    },
+    "topstitchStyles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/topstitchStyle" }
     }
   },
   "$defs": {
@@ -188,12 +200,102 @@
       "required": ["name", "sizes"],
       "additionalProperties": false,
       "properties": {
+        "id": { "type": "string", "minLength": 1 },
         "name": { "type": "string", "minLength": 1 },
         "sizes": {
           "type": "object",
           "minProperties": 1,
           "additionalProperties": { "$ref": "#/$defs/sizeSnapshot" }
         }
+      }
+    },
+    "contourRef": {
+      "type": "object",
+      "required": ["property"],
+      "additionalProperties": false,
+      "properties": {
+        "property": { "enum": ["boundary", "sewLines", "internalLines", "internalCutouts"] },
+        "index": { "type": "integer", "minimum": 0 }
+      },
+      "if": {
+        "properties": { "property": { "enum": ["sewLines", "internalLines", "internalCutouts"] } }
+      },
+      "then": { "required": ["property", "index"] }
+    },
+    "normalizedParam": { "type": "number", "minimum": 0, "maximum": 1 },
+    "seamSide": {
+      "type": "object",
+      "required": ["piece", "contour", "start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "piece": { "type": "string", "minLength": 1 },
+        "contour": { "$ref": "#/$defs/contourRef" },
+        "start": { "$ref": "#/$defs/normalizedParam" },
+        "end": { "$ref": "#/$defs/normalizedParam" },
+        "reversed": { "type": "boolean" }
+      }
+    },
+    "seam": {
+      "type": "object",
+      "required": ["first", "second"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "first": { "$ref": "#/$defs/seamSide" },
+        "second": { "$ref": "#/$defs/seamSide" },
+        "fold": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "angle": { "type": "number" },
+            "strength": { "type": "number" }
+          }
+        },
+        "turned": { "type": "boolean" }
+      }
+    },
+    "topstitchTarget": {
+      "type": "object",
+      "required": ["piece"],
+      "additionalProperties": false,
+      "properties": {
+        "piece": { "type": "string", "minLength": 1 },
+        "contour": { "$ref": "#/$defs/contourRef" },
+        "start": { "$ref": "#/$defs/normalizedParam" },
+        "end": { "$ref": "#/$defs/normalizedParam" }
+      }
+    },
+    "topstitch": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "target": { "$ref": "#/$defs/topstitchTarget" },
+        "offset": { "type": "number" },
+        "extendStart": { "type": "boolean" },
+        "extendEnd": { "type": "boolean" },
+        "corner": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "curved": { "type": "boolean" },
+            "curvedLength": { "type": "number" },
+            "rightAngled": { "type": "boolean" }
+          }
+        },
+        "placement": { "type": "string" },
+        "style": { "type": "string" }
+      }
+    },
+    "topstitchStyle": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "modelType": { "type": "integer" }
       }
     }
   }

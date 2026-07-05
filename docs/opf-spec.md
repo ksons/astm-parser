@@ -1,6 +1,6 @@
 # Open Pattern Format (OPF) Specification
 
-**Version 0.3.0** — Draft
+**Version 0.4.0** — Draft
 
 OPF is a JSON-based interchange format for 2D apparel/garment patterns. It is
 designed as a modern replacement for the DXF-based ASTM D6673 / AAMA-292
@@ -38,11 +38,14 @@ OPF addresses these by making the pattern domain model explicit, validatable
 
 ```jsonc
 {
-  "version": "0.3.0",          // OPF semantic version
+  "version": "0.4.0",          // OPF semantic version
   "asset":   { ... },          // provenance and units
   "style":   { ... },          // style-level information
   "sizes":   ["26", "28"],     // the style's size run, sorted
-  "pieces":  [ ... ]           // pattern pieces
+  "pieces":  [ ... ],          // pattern pieces
+  "sewing":  [ ... ],          // optional: assembly seams
+  "topstitching":    [ ... ],  // optional: decorative stitch lines
+  "topstitchStyles": [ ... ]   // optional: stitch style definitions
 }
 ```
 
@@ -83,6 +86,7 @@ A piece is a name plus one **size snapshot** per size it exists in:
 
 ```jsonc
 {
+  "id": "RXP8nE",              // optional stable identifier
   "name": "FRONT",
   "sizes": {
     "36": { ...sizeSnapshot },
@@ -90,6 +94,11 @@ A piece is a name plus one **size snapshot** per size it exists in:
   }
 }
 ```
+
+`id`, when present, must be unique within the document. Piece names may
+repeat (e.g. linked mirror copies); documents that contain `sewing` or
+`topstitching` references must make every referenced piece unambiguous —
+by `id`, or by a unique name.
 
 Every piece should include a snapshot for the style's `baseSize`; that
 snapshot is the anchor for future rule-based grading.
@@ -201,6 +210,101 @@ source, OPF preserves them as contour arrays under `qualityValidation`
 is omitted otherwise. Consumers that only draw or cut patterns can ignore
 this group.
 
+## Sewing
+
+The optional document-level `sewing` array records assembly seams:
+which contour ranges are sewn together. ASTM DXF cannot express this;
+the data originates from garment CAD/3D authoring tools.
+
+```jsonc
+{
+  "name": "Sewing_185633",                      // optional
+  "first": {
+    "piece": "RXP8nE",                          // piece.id, else unique name
+    "contour": { "property": "sewLines", "index": 0 },
+    "start": 0.5176,
+    "end": 0.2651,
+    "reversed": true                            // default false
+  },
+  "second": {
+    "piece": "aB3dEf",
+    "contour": { "property": "boundary" },
+    "start": 0.1554,
+    "end": 0.5815
+  },
+  "fold": { "angle": 180, "strength": 5 },      // optional
+  "turned": false                               // optional
+}
+```
+
+### Contour references
+
+`contour.property` names a snapshot property (`boundary`, `sewLines`,
+`internalLines`, `internalCutouts`); `contour.index` is required for
+the array-valued properties. A reference addresses the *corresponding*
+contour in **every** size snapshot of the piece — producers must keep
+contour order stable across sizes.
+
+Seams attach to the line that is physically stitched: the net outline.
+For pieces whose `boundary` is a cut line with seam allowance, that is
+`sewLines[0]`; for pieces without separate seam allowance it is
+`boundary` itself.
+
+### Parameter ranges
+
+`start` and `end` are **normalized arc-length parameters** in [0, 1],
+measured along the contour from its `start` vertex following segment
+order (including the implicit closing edge of closed contours). Because
+they are fractions of the total length, the same range applies to every
+size — seam definitions are grading-invariant by construction.
+
+A side covers the arc traveled **from `start` to `end`**: in the
+direction of increasing parameter when `reversed` is false (wrapping
+1 → 0 on closed contours if `end < start`), in the direction of
+decreasing parameter when `reversed` is true (wrapping 0 → 1 if
+`end > start`). On open contours no wrap exists: `reversed: false`
+requires `start ≤ end` and `reversed: true` requires `start ≥ end`.
+
+The sewn correspondence is linear in arc length between the two sides'
+traversals: the point at `first.start` meets the point at
+`second.start`, and both traversals progress together to `end`. Sides
+of unequal arc length imply ease (gathering/stretch), distributed
+proportionally.
+
+### Fold and turned
+
+`fold.angle` is the fold angle across the seam in degrees (180 = flat,
+i.e. no fold); `fold.strength` is a tool-defined stiffness value.
+`turned` marks seams whose allowance is turned. Both are optional and
+informational for 2D consumers.
+
+## Topstitching
+
+The optional `topstitching` array records decorative stitch lines that
+run parallel to a contour; `topstitchStyles` holds reusable style
+definitions they reference.
+
+```jsonc
+{
+  "name": "Topstitch_1928505",
+  "target": { "piece": "RXP8nE",
+              "contour": { "property": "boundary" },
+              "start": 0.0, "end": 0.25 },      // omit start/end: whole contour
+  "offset": 1.3,                                 // distance in document units
+  "extendStart": true,
+  "extendEnd": true,
+  "corner": { "curved": false, "curvedLength": 5, "rightAngled": false },
+  "placement": "Seam Both",                      // seam-line stitches only
+  "style": "st1"                                 // -> topstitchStyles[].id
+}
+```
+
+`target` uses the same contour reference and parameter semantics as
+seam sides; `target.contour` may be omitted when the source only
+exposes the owning piece. All fields are optional except that a
+topstitch object must not be empty; producers should emit at least
+`name` or `target`.
+
 ## Mapping from ASTM D6673 / AAMA-292 DXF
 
 | DXF layer | ASTM meaning                        | OPF property                          |
@@ -243,6 +347,10 @@ and piece fields.
   contour; contours with `lines`/`cubic` segments (SVG path semantics);
   singular `grainLine`/`mirrorLine`; notch objects; point layers as vertex
   index arrays; `qualityValidation` optional; sparse size runs.
+- **0.4.0** — construction data (additive): optional `piece.id`;
+  document-level `sewing` (assembly seams as grading-invariant contour
+  parameter ranges), `topstitching` and `topstitchStyles`. Sourced from
+  garment CAD/3D tools; ASTM DXF sources emit none of these.
 
 ## Known limitations / future work
 

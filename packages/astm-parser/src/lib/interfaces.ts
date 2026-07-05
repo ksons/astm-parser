@@ -126,6 +126,82 @@ export interface ISizeSnapshot {
  * base size.
  */
 export interface IPatternPiece {
+  /**
+   * Optional stable identifier (unique within the document). Required
+   * in practice when the document contains `sewing`/`topstitching`
+   * references and piece names are not unique.
+   */
+  id?: string;
   name: string;
   sizes: Record<string, ISizeSnapshot>;
+}
+
+/**
+ * Reference to one contour of a piece's snapshots. `property` names
+ * the snapshot property; `index` is required for the array-valued
+ * properties. The reference addresses the corresponding contour in
+ * every size snapshot of the piece.
+ */
+export interface IContourRef {
+  property: 'boundary' | 'sewLines' | 'internalLines' | 'internalCutouts';
+  index?: number;
+}
+
+/**
+ * One side of a seam: a parameter range on a contour. `start`/`end`
+ * are normalized arc-length parameters in [0, 1], measured from the
+ * contour's `start` vertex following segment order (including the
+ * implicit closing edge of closed contours). Because they are
+ * fractions, the same range applies to every size (grading-invariant).
+ */
+export interface ISeamSide {
+  /** `piece.id` when present, else the (unique) piece name */
+  piece: string;
+  contour: IContourRef;
+  start: number;
+  end: number;
+  reversed?: boolean;
+}
+
+/** An assembly seam connecting two contour ranges. */
+export interface ISeam {
+  name?: string;
+  first: ISeamSide;
+  second: ISeamSide;
+  /** Fold across the seam: angle in degrees (180 = flat), tool-defined strength */
+  fold?: { angle?: number; strength?: number };
+  turned?: boolean;
+}
+
+/**
+ * Target of a topstitch. `contour` may be omitted when the source only
+ * exposes the owning piece; omit `start`/`end` for the whole contour.
+ */
+export interface ITopstitchTarget {
+  piece: string;
+  contour?: IContourRef;
+  start?: number;
+  end?: number;
+}
+
+/** A decorative stitch line running parallel to a contour. */
+export interface ITopstitch {
+  name?: string;
+  target?: ITopstitchTarget;
+  /** Distance from the contour, in document units */
+  offset?: number;
+  extendStart?: boolean;
+  extendEnd?: boolean;
+  corner?: { curved?: boolean; curvedLength?: number; rightAngled?: boolean };
+  /** Seam-line stitches: which side(s) of the seam (e.g. "Seam Both") */
+  placement?: string;
+  /** References `topstitchStyles[].id` */
+  style?: string;
+}
+
+/** A reusable topstitch style definition. */
+export interface ITopstitchStyle {
+  id: string;
+  name?: string;
+  modelType?: number;
 }
